@@ -1,0 +1,206 @@
+---
+title: "HW3"
+author: "Chongdan Pan"
+date: "2022/1/26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.width=7.5, fig.height=7.5, warning=FALSE, message=FALSE, fig.align="center", error=FALSE)
+```
+
+# Question 3.1
+
+### 1. Exploratory Analysis
+
+#### 1.1 Plot the data 
+```{r fig.height=3}
+x <- read.table(file="http://ionides.github.io/531w22/01/ann_arbor_weather.csv",header=TRUE)
+# x <- read.table(file="AnnArborWeather.csv",header=TRUE)
+x$Low[is.na(x$Low)] <- round(mean(x$Low, na.rm=TRUE),2)
+plot(Low~Year,data=x,type="l",main="Ann Arbor Jan Low Temperature")
+# global <- read.table(file="GlobalTemperature.txt",header=TRUE)
+global <- read.table(file="http://ionides.github.io/531w22/hw03/Global_Temperature.txt",header=TRUE)
+north <- read.csv(file="NothernTemperature.csv", header=TRUE)
+```
+It turns out that there is a missing value in the temperature of Ann Arbor, so I use its mean value to fill the NaN. In this way, the temperature range from $-22\sim19$ with mean $2.74$, and standard deviation $7.5$.
+
+On the other hand, although it looks like there is no clear linear trend in Ann Arbor's temperature, I'll use a linear regression to check it. For standard deviation, it's much higher after 1990, implying that the data is not stationary 
+
+
+#### 1.2 ACF of raw data and Linear Fitting
+
+Therefore, I'm fitting a linear model to the data with OLS to see if there is any linear trend. It turns out that the line is very horizontal, and the model's coefficient over the year is quite low, which is about 0.024.
+
+Then I plot the auto correlation function of the data, it turns out the ACF with lag equaling to 5, 10, 15 is very high, and it even goes out of the confidence interval when the lag is 15. I doubt that there's a seasonality in the temperature, but a 5-month period doesn't sound reasonable for me. Then I plot the ACF of residuals of linear model, and it behaves in a similar pattern.
+
+```{r}
+par(mfrow=c(3,1))
+lm_fit <- lm(Low~Year, data=x)
+summary(lm_fit)
+plot(Low~Year,data=x,type="l", main="Linear Fitting")
+yr <- 1900:2021
+prediction = cbind(1, yr)%*%coef(lm_fit)
+lines(x=x$Year, y=prediction, col="red")
+acf(x$Low, main="ACF of raw data")
+acf(x$Low - prediction, main="ACF of Residual of Linear Fitting")
+```
+The ARMA(2,2) does a good job at fitting, since no ACF is out of the confidence interval.
+
+### 2. ARMA fitting
+
+#### 2.1 ARMA Model Selection based on AIC
+
+The summary from linear regression shows that there is a slightly linear trend in the temperature, hence I'm going to apply ARMA model after moving out the linear trend.
+
+I use AIC values to choose the value of $p$ and $q$, but there are some numeric errors in the table.
+
+The table shows that there are some numeric error in the AIC. For example, the AIC difference ARMA(2,3) with adjacent model is larger than 2, which shouldn't happen.
+
+In addition, it turns out that ARMA(0,0) has the lowest AIC value, implying that $Y_n-\mu_n$ is just white noise. However, ARMA(2, 3) and ARMA(3,2) have relative low AIC, too, they can be good candidates for further analysis.
+```{r}
+require(knitr)
+aic_table <- function(data, P, Q, S, order=c(1,0,0)){
+  table <- matrix(NA, P+1, Q+1)
+  for(p in 0:P){
+    for(q in 0:Q){
+      tryCatch({
+          if(S<=0)model = arima(data, order=c(p, 0, q))
+          else{
+            model = arima(data, order=c(p, 0, q), seasonal=list(order=order, period=S))
+          }
+          table[p+1, q+1] <- model$aic
+      }, error = function(e) {})
+    }
+  }
+  dimnames(table) <- list(paste("AR", 0:P, sep=""), paste("MA", 0:Q, sep=""))
+  table
+}
+aa_aic_table <- aic_table(x$Low - prediction, 4, 4, 0)
+kable(aa_aic_table, digits=2, format="markdown", caption="AIC without seasonality")
+```
+
+#### 2.2 Model Estimation
+
+Although ARMA(3,2) and ARMA(2,3) have a relatively low AIC, it turns out that their coefficients on AR3 and MA3 is very small, too, implying that they may be reduced to the model ARMA(2,2). Since ARMA(2,2) has a low AIC value, its parameters are estimated as well.
+The result shows that ARMA(2,2) is a good model due to its low AIC value as well as high standard error of Intercept. ARMA(2,2) is casual and invertible because its two AR roots to be $0.93\pm0.5i$ and two MA roots to be $-0.89\pm0.45i$, which are all out of the unit circle. Due to the good features of ARMA(2,2), 
+
+|           | Intercept | SE(Intercept) | AR1     | AR2     | AR3    | MA1     | MA2    | MA3    |
+| --------- | --------- | ------------- | ------- | ------- | ------ | ------- | ------ | ------ |
+| ARMA(0,0) | 0         | 0.6715        |         |         |        |         |        |        |
+| ARMA(2,2) | -0.0042   | 0.6891        | -1.6649 | -0.8936 |        | 1.7843  | 1.0000 |        |
+| ARMA(3,2) | -0.0341   | 0.6554        | 0.7864  | -1.0027 | 0.0653 | -0.8173 | 1.0000 |        |
+| ARMA(2,3) | -0.0337   | 0.6477        | 0.7192  | -0.9542 |        | -0.7574 | 0.9516 | 0.0593 |
+
+```{r  fig.height=2.5}
+acf(arima(x = x$Low - prediction, order = c(2, 0, 2))$residuals, main="ACF of Redisuals from ARMA(2,2) Model")
+```
+
+#### 2.3 Confidence Interval Simulation
+
+The ARMA(2,2)'s confidence interval generated by Fisher information is
+
+|          | AR1    | AR2     | MA1    | MA2    | Intercept                                        |
+| -------- | ------ | ------- | ------ | ------ | ------------------------------------------------ |
+| $\mu$    | -1.665 | -0.8936 | 1.7843 | 1      | -0.0042                                          |
+| $\sigma$ | 0.0473 | 0.0496  | 0.0378 | 0.0392 | 0.6891                                           |
+
+There are many parameters to be estimated, but we'll take MA1 as an example for profile likelihood estimation.
+
+```{r fig.height=4}
+K <- 50
+ma1 <- seq(from=0.5,to=2,length=K)
+profile_loglik <- rep(NA,K)
+for(k in 1:K) {
+  tryCatch({
+    profile_loglik[k] <- logLik(arima(x$Low-prediction,order=c(2,0,2),
+                                      fixed=c(NA,NA,ma1[k],NA,NA)))
+  }, error = function(e) {})
+}
+plot(profile_loglik~ma1,ty="l", main="Profile Likelihood of MA")
+```
+
+The log likelihood curve has a weird shape, but we can still estimate the confidence of MA1 parameter when the log likelihood is larger than -416.79. In this way, the confidence interval of ma1 is around $[1.44,1.81]$ and a small interval around $1.96$. Then we can use bootstrap to test our profile likelihood estimates. The histogram turns out to be more consistent with the profile likelihood of MA1, it's because the log likelihood function is not quadratic around the $\hat\theta_{MLE}$
+
+```{r fig.height=4}
+set.seed(123456)
+J <- 500
+model = arima(x$Low-prediction,order=c(2,0,2))
+params <- coef(model)
+ar <- params[grep("^ar",names(params))]
+ma <- params[grep("^ma",names(params))]
+intercept <- params["intercept"]
+sigma <- sqrt(model$sigma2)
+theta <- matrix(NA,nrow=J,ncol=length(params),
+                dimnames=list(NULL,names(params)))
+for(j in 1:J) {
+  try( {
+    Y_j <- arima.sim(
+      list(ar=ar,ma=ma),
+      n=length(x$Low),
+      sd=sigma
+    )+intercept
+    theta[j,] <- coef(arima(Y_j,order=c(2,0,2)))
+  } )
+}
+hist(theta[,3],xlim=c(0.5,2), breaks=100, main="Bootstrap Result of MA1 parameter of ARMA(2,2) ")
+```
+
+
+
+#### 2.4 Simulation
+
+
+### 3. Seasonality and Trend Analysis
+
+#### 3.1 Seasonality Analysis
+
+From previous ACF plot, it seems that there is a 5-lag seasonality in the data, therefore, I'm using a SARMA model to fit the data. However, the AIC value doesn't decrease and the residual's ACF is still out of the confidence interval when lag is equal to 15.
+
+Hence, I think it might be related to the coefficient of seasonality coefficients. I set the order of SAR parameters to be 3 since the ACF of lag 15 is very high. The result is quite good, and the AIC value is lower than previous models. I plot the ACF of SARMA(1,0,3,0), and it turns out all the ACF are in the confidence interval, meaning that the model is doing a good job!
+
+```{r fig.width=7.5}
+par(mfrow=c(2,1))
+aa_aic_table <- aic_table(x$Low - prediction, 4, 4, 5)
+kable(aa_aic_table, digits=2, format="markdown", caption="AIC with SARMA(p,q,1,0) and 5-lag seasonality")
+aa_aic_table <- aic_table(x$Low - prediction, 4, 4, 5, order=c(3,0,0))
+kable(aa_aic_table, digits=2, format="markdown", caption="AIC with SARMA(p,q,3,0) and 5-lag seasonality")
+
+model = arima(x$Low - prediction, order=c(2, 0, 2), seasonal=list(order=c(1,0,0), period=5))
+acf(model$residuals, main="ACF with SARMA(2,2,1,0) 5-lag seasonality")
+model = arima(x$Low - prediction, order=c(2, 0, 2), seasonal=list(order=c(3,0,0), period=5))
+acf(model$residuals, main="ACF with SARMA(2,2,3,0) 5-lag seasonality")
+
+```
+
+#### 3.2 Trend Analysis
+
+I normalize Ann Arbor's temperature, global temperature and the result from SARMA(2,2) model so that they can plotted together.
+The black lines are from SARMA(2,2) model while the green lines are Ann Arbor's temperature. For the global temperature and northern hemisphere Jan Temperature, they're in red and blue respectively. Based on the plot, it turns out that there's a clear uptrend in the global temperature, while the other two lines doesn't follow the trend at all
+
+```{r fig.height=3}
+model = arima(x$Low - prediction, order=c(2, 0, 2), seasonal=list(order=c(3,0,0), period=5))
+ar <- params[grep("^ar",names(params))]
+ma <- params[grep("^ma",names(params))]
+sar <- params[grep("^sar",names(params))]
+intercept <- params["intercept"]
+sigma <- sqrt(model$sigma2)
+sim <- arima.sim(
+      list(ar=ar,ma=ma,sar=sar),
+      n=length(x$Low),
+      sd=sigma
+    )+intercept + prediction
+x$Sim <- (sim - mean(sim)) / sd(sim)
+plot((x$Low-mean(x$Low))/sd(x$Low)~Year,data=x,type="l",col="green", ylab="Normalized Temperature")
+lines(((Temperature-mean(Temperature)) / sd(Temperature))~Year, data=north, type="l", col="blue")
+lines(((Anomaly-mean(Anomaly)) / sd(Anomaly))~Year,data=global,col="red")
+lines(Sim~Year, data=x, type="l")
+```
+
+### 4. Reference
+- [Course Slides for Chapter 4](https://ionides.github.io/531w22/04/slides-annotated.pdf)
+- [Course Slides for Chapter 5](https://ionides.github.io/531w22/05/slides-annotated.pdf)
+- [Course Slides for Chapter 6](https://ionides.github.io/531w22/06/slides-annotated.pdf)
+- [Previous report for HW3](https://ionides.github.io/531w21/hw03/sol03.html)
+- [Piazza Post about the Process of Time Series Analysis](https://piazza.com/class/kxjb75njby03j5?cid=61)
+- [Climate Data from NOAA](https://www.ncdc.noaa.gov/cag/global/time-series/nhem/land_ocean/1/1/1880-2021)

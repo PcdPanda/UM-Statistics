@@ -1,0 +1,150 @@
+---
+title: "HW04"
+author: "Chongdan Pan"
+date: "2022/2/4"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, fig.align="center")
+```
+
+# Problem 1
+
+### (a)
+
+```{r}
+df <- read.csv("../Rus2000_daily_Feb3_2017-Feb3_2022.csv", header=TRUE)
+ret = df$Adj.Close[2:nrow(df)] / df$Adj.Close[1:nrow(df)-1] - 1
+hist(ret, breaks=50)
+```
+
+The return seems to be symmetric to the 0, and it has a high kurtosis since there a lot of data in near 0, therefore it distribution may have a heavy tail although we don't have a lot of samples with high absolute value.
+
+### (b)
+
+| median    | mean      | variance     | skewness   | kurtosis |
+| --------- | --------- | ------------ | ---------- | -------- |
+| 0.0008414 | 0.0004222 | 0.0002433763 | -0.9844468 | 13.37257 |
+
+The mean, median, and skewness are close to zero, so the data is symmetric to 0. The kurtosis is very high, implying that the data may have a heavy tail.
+
+```{r}
+plot(density(ret), main="Kernel Density Estimate")
+```
+
+The estimate result is quite good since it's smooth and similar to the original histogram. In addition, it's clearly showing the high kurotsis and low skewness.
+
+### (c)
+
+```{r}
+-1e6 * qnorm(0.005, mean(ret), sd(ret))
+```
+
+Therefore, the VaR from normal distribution estimation is 39762.09 dollars
+
+### (d)
+
+```{r, fig.height=7.5, fig.width=7.5}
+library(evir)
+par(mfrow=c(2,2))
+loss = -ret
+eecdf = ecdf(loss)
+plot(eecdf, main="ECDF of Loss", xlab="Claims", ylab="ECDF")
+uv = seq(from = 0.025,to = 0.1, by = .001)
+plot(uv,eecdf(uv), main="ECDF of Loss Tail", xlab="Claims", ylab="ECDF")
+shape(loss, models=30, start=300, end=20, ci=0.9, reverse = TRUE, auto.scale=TRUE)
+mu = 0.015
+gpd_out = gpd(loss, threshold = mu)
+gpd_out$par.ests
+tailplot(gpd_out)
+```
+
+It turns out when I set the threshold to be 0.015, the result from tail plot is linear, and the shape parameter is around 0.29
+
+### (e)
+
+```{r}
+qt = 1-.005/(1-eecdf(mu))
+xi = gpd_out$par.ests[1]
+scale = gpd_out$par.ests[2]
+VaR = qgpd(qt, xi, mu, scale)
+1e6 * VaR
+```
+The VaR result is 57985.9 dollars, which is much larger than the result from normal distribution. Therefore, it's inappropriate to estimate the tail through empirical distribution when $q$ is small.
+
+### (f)
+
+```{r}
+quant(loss, p = 0.995, models = 20, start = 600, end = 40, reverse =TRUE, ci = FALSE, auto.scale = TRUE, labels = TRUE)
+```
+
+It turns out that the VaR is quite stable in the range from 0.003 to 0.018, and setting threshold to be 0.015 can work well for tail estimation.
+
+### (g)
+- For ES in part(c)
+
+```{r}
+1e6 * (mean(ret) + sd(ret) * dnorm(qnorm(0.005)) / 0.005)
+```
+
+The expected shortfall is 45538.1 dollars
+
+- For ES in part(e)
+
+```{r}
+qt = 1-.005/(1-eecdf(mu))
+xi = gpd_out$par.ests[1]
+scale = gpd_out$par.ests[2]
+1e6 * (VaR + (scale + xi * (VaR - mu)) / (1 - xi))
+```
+
+The expected shortfall is 88046.23   dollars
+
+# 2
+
+### (a)
+
+$$
+COV[X,Y] = COV[X, X^2] = E[(X-E[X])(X^2 - E[X^2])]=E[X^3]=0
+$$
+
+The covariance of $X$ and $Y$ is 0, so they're not correlated. However, since $Y=X^2$, then they're not independent.
+
+### (b)
+
+Based on the definition, we have
+$$
+\hat\rho_S=\frac{12}{n(n^2-1)}[\sum_{i=0}^{\lfloor n/2\rfloor}(2*i + 1-\frac{n+1}{2})(n+1-n-1)-(\lfloor n/2\rfloor-\frac{n+1}{2})(1-\frac{n+1}{2})]
+\\\hat\rho_S=0
+$$
+
+### (c)
+
+$$\text{Let}\quad w=\begin{bmatrix}x\\y\\z\end{bmatrix}
+\\\text{Then}\quad Var(w^TY)=w^TCov(Y)w=x^2+y^2+z^2+1.8(xy+yz+axz)
+\\\text{Assume}\quad a=0\quad\text{and}\quad x=z=1,y=-1.8
+\\\text{Then}\quad Var(w^TY)=-1.24
+$$
+```{r}
+w = as.vector(c(1, -1.8, 1))
+x =matrix(c(1, 0.9, 0, 0.9, 1, 0.9, 0, 0.9, 1), nrow=3, ncol=3)
+t(w)%*%x%*%w
+```
+
+Since the variance should be always larger than 0, then $a$ can't be 0
+
+### (d)
+
+Since the matrix is covariance, then all its eigenvalues must greater than 0. To calculate the eigenvalues, we have
+
+$$
+\begin{bmatrix}1-\lambda&0.9&a\\0.9&1-\lambda&0.9\\a&0.9&1-\lambda\end{bmatrix}=0
+\\\text{Hence,it's determinant is}\quad(1-\lambda-a)[\lambda^2-(2+a)\lambda+a-0.62]=0
+\\\text{Then we have three eigenvalues}\quad \lambda_1=1-a,\lambda_2=\frac{a+2+\sqrt{a^2+6.48}}{2},\lambda_3=\frac{a+2-\sqrt{a^2+6.48}}{2}
+\\\text{Since all eigenvalues must be greater or equal to 0, we have }0.62\leq a\leq 1 
+$$
+
+Therefore, the lower limit on $a$ is 0.62
