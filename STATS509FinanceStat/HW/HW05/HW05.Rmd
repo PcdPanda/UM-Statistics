@@ -1,0 +1,162 @@
+---
+title: "HW05"
+author: "Chongdan Pan"
+date: "2022/2/12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+```
+
+### Problem 1
+a. $$
+E(0.6R_1+0.4R_2)=0.6E(R_1)+0.4E(R_2)=0.6 * 0.03 + 0.4 * 0.04=0.034\\
+Var(0.6R_1+0.4R_2)=0.36Var(R_1)+0.16Var(R_2)+0.48Cov(R_1, R_2)\\
+Var(0.6R_1+0.4R_2)=0.36\times0.04^2+0.16\times0.06^2+0.48*0.5*0.04*0.06=0.001728
+$$
+b. The variance is $$Var(w\cdot R_1+(1-w)R_2)=0.0016w^2+0.0036(1-w)^2+2w(1-w)*0.0012$$
+To minimize it, we need to calculate its derivative, which is
+$$2w\cdot0.0016-2(1-w)\cdot0.0036+2(1-w)\cdot0.0012-2w\cdot0.0012$$
+When $w=\frac{6}{7}$, since the second derivative is positive, we have the minimized variance.
+
+c. For the multi-variate normal distribution
+
+```{r}
+V = Inf
+W = 0
+for(w in seq(0, 1, 0.05)){
+  mean <- w * 0.03 + (1-w) * 0.04
+  var <- (w * 0.04) ^ 2 + ((1-w) * 0.06) ^ 2 + 2 * w * (1-w) * 0.5 * 0.04 * 0.06
+  VaR <- - 1e6 * qnorm(0.005, mean, var ** 0.5)
+  if(VaR<V){
+    V <- VaR
+    W <- w
+  }
+}
+W
+```
+
+d. For the multi-variate t-distribution
+```{r}
+V = Inf
+W = 0
+q = qt(0.005, df=6)
+for(w in seq(0, 1, 0.01)){
+  mean <- w * 0.03 + (1-w) * 0.04
+  lambda <- sqrt((4 / 6) *((w * 0.04) ^ 2 + ((1-w) * 0.06) ^ 2 + 2 * w * (1-w) * 0.5 * 0.04 * 0.06))
+  VaR <- - 1e6 * (mean + (q * lambda))
+  if(VaR<V){
+    V <- VaR
+    W <- w
+  }
+}
+W
+```
+
+### Problem 2
+
+a.
+$$
+C(u_1, u_2)=P(F_X(x)\leq u_1,F_Y(y)\leq u_2)=P(F_X(x)\leq u_1,F_X(x)\leq u_2)\\
+C(u_1, u_2)=\min(u_1, u_2)
+$$
+
+b.
+$$
+C(u_1, u_2)=P(F_X(x)\leq u_1,F_Z(z)\leq u_2)\\
+C(u_1, u_2)=P(F_X(x)\leq u_1,1-F_X(\sqrt[3]z)\leq u_2)\\
+C(u_1, u_2)=\begin{cases}u_1+u_2-1 &u_1+u_2\geq1\\0 & u_1+u_2<1\end{cases}
+$$
+
+### Problem 3
+
+a.
+```{r}
+Data = read.csv("midcapD.csv",header=TRUE)
+Mid_Returns = Data[,c(5,6,7)]
+plot(Mid_Returns)
+```
+It's hard to see correlations from the scatter plot intuitively. But it looks like that there is a linear relationship between ALTR and APH. We can validate it through R.
+
+|      | NYB    | ALTR   | APH    |
+| ---- | ------ | ------ | ------ |
+| NYB  | 1      | 0.1155 | 0.0754 |
+| ALTR | 0.1155 | 1      | 0.3814 |
+| APH  | 0.0754 | 0.3814 | 1      |
+
+Based on the result, it turns out all stocks have a positive correlation coefficient and it's larger for APH and ALTR. In addition, all stocks is slightly skewed. NYB and APH has a high kurtosis, implying that they may have a heavy tail.
+
+|          | NYB    | ALTR  | APH   |
+| -------- | ------ | ----- | ----- |
+| skewness | -0.348 | 0.274 | 0.414 |
+| kurtosis | 3.66   | 1.32  | 4.04  |
+
+
+b.
+The return have following mean vector and covariance matrix for multivariate normal distribution
+
+|      | NYB      | ALTR     | APH      |
+| ---- | -------- | -------- | -------- |
+| mean | 1.687e-3 | 1.488e-3 | 1.612e-3 |
+
+|      | NYB                | ALTR      | APH       |
+| ---- | ------------------ | --------- | --------- |
+| NYB  | 5.4069e-4          | 1.6177e-4 | 7.3901e-5 |
+| ALTR | 1.6177e-4          | 3.6237e-3 | 9.6669e-4 |
+| APH  | 7.3901e-59.6669e-4 |           | 1.7722e-3 |
+
+
+
+```{r}
+qqnorm(Mid_Returns$NYB, main="Norm for NYB")
+qqline(Mid_Returns$NYB)
+
+qqnorm(Mid_Returns$ALTR, main="Norm for ALTR")
+qqline(Mid_Returns$ALTR)
+
+qqnorm(Mid_Returns$APH, main="Norm for APH")
+qqline(Mid_Returns$APH)
+```
+It turns out that all return have a heavier tail than normal distribution, implying that we need to use a heavy tail for fitting. ALTR has a relative thin tail, conforming the empirical kurtosis from previous section. For APH and NYB, it looks like that APH's tail is not long heavy, but also very long. 
+
+c. 
+
+```{r}
+library(mnormt)
+library(MASS)
+df = seq(2.5, 8, 0.01)
+n = length(df)
+loglik_max = rep(0, n)
+for(i in 1:n){
+  fit = cov.trob(Mid_Returns, nu=df[i])
+  mu = as.vector(fit$center)
+  sigma = matrix(fit$cov, nrow=3)
+  loglik_max[i] = sum(log(dmt(Mid_Returns, mean=fit$center, S=fit$cov, df=df[i])))
+}
+plot(df, loglik_max, xlab="nu", ylab="Profile-likelihood function")
+nu = df[which.max(loglik_max)]
+ci = df[which(loglik_max>max(loglik_max)-0.5 * qchisq(0.95, df=1))]
+```
+The max likelihood estimate of $\nu$ is 4.64, and the confidence is $[3.67, 6.02]$
+
+```{r}
+p = (0:dim(Mid_Returns)[1]) / (dim(Mid_Returns)[1] + 1)
+qqplot(Mid_Returns$NYB, qt(p, nu), main="Norm for NYB")
+qqline(Mid_Returns$NYB, qt(p, nu))
+qqplot(Mid_Returns$ALTR, qt(p, nu), main="Norm for ALTR")
+qqline(Mid_Returns$ALTR, qt(p, nu))
+qqplot(Mid_Returns$APH, qt(p, nu), main="Norm for APH")
+qqline(Mid_Returns$APH, qt(p, nu))
+```
+
+d.
+It turns out the t-distribution can fit NYB and APH's heavy tail well, but not so much for ALTR. I guess that because all variables are sharing the same tail when being fitted by a multivariate t-distribution.
+```{r}
+fitfinal = cov.trob(Mid_Returns, nu=nu)
+aic_t <- -2 * sum(log(dmt(Mid_Returns, mean=fitfinal$center, S=fitfinal$cov, df=nu))) + 2 * (3 * 3)
+aic_n <- -2 * sum(log(dmnorm(Mid_Returns, mean=colMeans(Mid_Returns), varcov=cov(Mid_Returns)))) + 2 * (3 * 3 + 1)
+print(aic_t)
+print(aic_n)
+```
+The AIC value also validates my preference to the multivariate t-distribution, it has a lower AIC value to be -5734, which is much smaller than the multivariate normal distribution.

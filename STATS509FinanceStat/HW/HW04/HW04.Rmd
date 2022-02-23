@@ -3,8 +3,8 @@ title: "HW04"
 author: "Chongdan Pan"
 date: "2022/2/4"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -108,10 +108,20 @@ The expected shortfall is 88046.23   dollars
 ### (a)
 
 $$
-COV[X,Y] = COV[X, X^2] = E[(X-E[X])(X^2 - E[X^2])]=E[X^3]=0
+COV[X,Y] = COV[X, X^2] = E[(X-E[X])(X^2 - E[X^2])]=E[X^3]-E[X]E[X^2]=0
 $$
 
-The covariance of $X$ and $Y$ is 0, so they're not correlated. However, since $Y=X^2$, then they're not independent.
+The covariance of $X$ and $Y$ is 0, so they're not correlated. For independence
+
+$$
+p(x,y)=p(y)p(x|y)=\begin{cases}
+f_X(x)&y=x^2\\0&y\neq x^2
+\end{cases}
+$$
+
+However, when $y\neq x^2,p(y)p(x)=f_X(x)f_Y(y)=f_X(x)f_X(\sqrt y)$
+
+Since $X$ is uniformly distributed on $[-a, a]$, $p(x,y)!=p(x)p(y)$ when $x!=y$, therefore, they're not independent.
 
 ### (b)
 

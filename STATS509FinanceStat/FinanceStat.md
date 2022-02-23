@@ -104,9 +104,9 @@ $$
   \hat f_b(x)=\frac{1}{n}\sum_{i=1}^nK_b(x-x_i)
   $$
 
-- $K_b$: kernel function,可以是任何density function
+- $K_b$: kernel function,<u>可以是任何density function,方差必须是1</u>
 
-- 本质上是样本的平滑分布,$b$描述了平滑性
+- 本质上是样本的平滑分布,$b$越大,越平滑
 
 ##### Bandwidth $b$
 
@@ -151,9 +151,9 @@ $$
 
 ##### General Pareto Distribution
 
-| 参数                | 随机变量$X$         | PDF                                                          | CDF                                                | 期望                            | 方差                                          |
-| ------------------- | ------------------- | ------------------------------------------------------------ | -------------------------------------------------- | ------------------------------- | --------------------------------------------- |
-| $\alpha,x_m,\sigma$ | 和最低值$x_m$的比值 | $f_X(x)=\frac{1}{\sigma}(1+\frac{x-x_m}{\alpha\sigma})^{-\alpha - 1}$ | $F_X(x)=1-(1+\frac{\xi(x-x_m)}{\sigma})^{-\alpha}$ | $x_m+\frac{\sigma}{1-1/\alpha}$ | $\frac{\sigma^2}{(1-1/\alpha)^2(1-2/\alpha)}$ |
+| 参数                | 随机变量$X$         | PDF                                                          | CDF                                                   | 期望                            | 方差                                          |
+| ------------------- | ------------------- | ------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------- | --------------------------------------------- |
+| $\alpha,x_m,\sigma$ | 和最低值$x_m$的比值 | $f_X(x)=\frac{1}{\sigma}(1+\frac{x-x_m}{\alpha\sigma})^{-\alpha - 1}$ | $F_X(x)=1-(1+\frac{(x-x_m)}{\alpha\sigma})^{-\alpha}$ | $x_m+\frac{\sigma}{1-1/\alpha}$ | $\frac{\sigma^2}{(1-1/\alpha)^2(1-2/\alpha)}$ |
 
 帕累托分布具有<u>特别厚的多项式尾部</u>,适合用来估计条件概率
 
@@ -166,7 +166,7 @@ $$
 
 - 很难计算$a(u)$的值,但是可以用QQ plot判断是否符合Pareto Distribution并分析tail
 
-### 2.4 Tail Estimation
+### 2.4 <u>Tail Estimation</u> 
 
 ##### Overview
 
@@ -181,10 +181,91 @@ $$
 
 ##### 估计流程
 
-1. Plot ECDF分布的Tail
-2. 使用shape plot画出Pareto Distribution的shape parameter估计值和threshold $x_m$的关系
+1. Plot ECDF分布的Tail (只能使用daily return而不是log return)
+2. 使用shape plot画出GPD的$\hat\xi$和threshold $u$的关系
 3. threshold要尽量大,但是shape parameter要尽量稳定
 4. 通过Tail plot检验threshold选取的质量
-5. 计算$\tilde VaR_q=GPD^{-1}[1-\frac{q}{1-ECDF(x_m)}]$
-6. 基于GPD期望的性质,可以得到$ES=\tilde VaR_q+\frac{\hat\sigma+\hat\xi(\tilde VaR_q-x_m)}{1-\hat\xi}$
+5. 计算$\tilde{VaR_q}=GPD^{-1}[1-\frac{q}{1-ECDF(x_m)}]$
+6. 基于GPD期望的性质,可以得到$ES=\tilde{VaR_q}+\frac{\hat\sigma+\hat\xi(\tilde VaR_q-x_m)}{1-\hat\xi}$
+
+##### 多变量Tail Dependence
+
+- Lower Dependency (描述左下角): $\lambda_l=\lim_{q\rightarrow0}P[F_1(X_1)\leq q|F_2(X_2)\leq q]$
+- Upper Dependency (描述右上角): $\lambda_u=\lim_{q\rightarrow 1}P[F_1(X_1)\geq q|F_2(X_q)\geq q]$
+- Gaussian Copula: $\lambda_u=\lambda_l=0$
+- T-Copula: $\lambda_u=\lambda_l=2F_{t,\nu+1}[-\sqrt{\frac{(\nu + 1)(1-\rho)}{1+\rho}}]$
+
+# 3. Portfoilo Management
+
+### 3.1 Portfoilo基本性质
+
+##### 双资产管理
+
+给定双资产组成的Portfolio $V=n_1P_1+n_2P_2$
+
+- 权重向量$w=\begin{bmatrix}\frac{n_1P_1}{n_1P_1'+n_2P_2'}&\frac{n_2P_2}{n_1P_1'+n_2P_2'}\end{bmatrix}$
+
+- 收益率$R=\frac{V'}{V}=\frac{n_1P_1'+n_2P_2'}{n_1P_1+n_2P_2}$,通过$R$来计算$VaR$和Expected Shortfall
+
+- 对于双资产Portfolio $V=wR_1+(1-w)R_2$,则<u>通过分散投资不相关资产来最小化风险</u>
+  $$
+  w=\frac{\sigma^2_2-\rho_{12}\sigma_1\sigma_2}{\sigma_1^2+\sigma_2^2-2\rho_{12}\sigma_1\sigma_2}
+  $$
+
+##### <u>Copula模型应用</u>
+
+1. 对每个asset估计marginal distribution $\hat F_P$
+2. 使用QQ plot判断$\hat F_p$的估计准确度,注意tail
+3. 计算asset之间的spearman相关系数
+4. 用$\hat F_p$生成概率并带入copula模型
+
+5. 绘制copula的等高线,分析估计质量
+6. 从copula生成模拟数据,并获得不同权重时的$VaR$
+
+	### 3.2 风险资产模型
+
+##### 定义
+
+| 资产收益率向量                                  | 资产收益率期望                                         | 收益率协方差矩阵       |
+| ----------------------------------------------- | ------------------------------------------------------ | ---------------------- |
+| $R=\begin{bmatrix}R_1\cdots R_N\end{bmatrix}^T$ | $E[R]=\begin{bmatrix}\mu_1\cdots \mu_N\end{bmatrix}^T$ | $\text{Cov}(R)=\Sigma$ |
+
+已知上述条件,找到最合适的权重向量$W=\begin{bmatrix}w_1\cdots w_N\end{bmatrix}^T$在收益率最大的情况下最小化风险
+
+- 最小化标准差: $\min w^T\Sigma w$
+- 最大化收益率: $w^T\mu=\mu^*$
+- 权重和为1: $w^TI=1$
+- 可能还有分散投资,不能做空等附加条件
+- 生成的结果为<u>有效边界: 在固定资产的方差$\sigma$的情况下,可以获得的最大收益$\mu$</u>
+
+##### 无风险资产混合投资
+
+- 在资产组合中引入了收益率为$\mu_f$的无风险资产
+- 需要最大化夏普比率:描述了额外收益$E(R)-\mu_f$和风险$\sigma$的比值,<u>最大化夏普比率等于寻找切线</u>
+
+$$
+\frac{E(R)-\mu_f}{\sigma}
+$$
+
+- 令风险资产权重为$w$则有
+  - 收益率$\mu=\mu_f+w(\mu_p-\mu_f)$
+  - 方差$\sigma=w\sigma_p$
+
+##### 最大化夏普比率
+
+- 对于双资产混合无风险模型,令$v_1=\mu_1-\mu_f,v_2=\mu_2-\mu_f$,则第一个资产的权重有
+  $$
+  w_T=\frac{v_1\sigma_2^2-v_2\rho_{12}\sigma_1\sigma_2}{v_1\sigma_2^2+v_2\sigma_1^2-(v_1+v_2)\rho_{12}\sigma_1\sigma_2}
+  $$
+
+- 在最大化夏普比率的基础上,根据资产模型的方差限制,获得无风险资产的配置
+
+1. 根据$w_T$获得风险资产标准差$\sigma_T,\mu_T$
+2. 根据给定的风险目标,获得风险资产总占比权重 $w=\frac{\sigma_{target}}{\sigma_T}$
+3. 或者根据给定的收益率目标,获得风险资产总比权重$w=\frac{\mu_{target}-\mu_f}{\mu_T-\mu_f}$
+4. 每个风险资产的比重为$w\cdot w_T$
+
+
+
+
 

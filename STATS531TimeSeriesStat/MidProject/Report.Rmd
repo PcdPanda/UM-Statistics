@@ -1,0 +1,325 @@
+---
+title: "Time Series Analysis of Cryptocurrency"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align="center", error=FALSE, fig.width=10)
+```
+## 1. Introduction
+#### 1.1 Motivation
+
+Recently, cryptocurrencies such as Bitcoins have been the most most heated topic all around the world. Cryptocurrencies are being used in multiple areas including decentralized ﬁnance, application development, art collections, etc. The market value also increased dramatically in the past 10 years, from less than one hundred dollars to more than two trillion dollars.
+
+However, cryptocurrencies are not only about price. Some people are complaining that Bitcoins are wasting more and more energy for meaningless purposes while others are amazed by its decentralized
+transaction. Therefore, this project will perform a time series analysis to investigate the price as well as other indicators of Bitcoin so that we can have more insight and deeper understanding of cryptocurrency.
+
+#### 1.2 Data Introduction
+
+Our data set is from [blockchain.com](https://www.blockchain.com/charts), and we mainly use 5 fields of Bitcoin from past 3 years.
+
+- <b>Market Price</b>: The price of each Bitcoin calculated in USD. 
+
+- <b>Trade Volume</b>: The number of Bitcoin traded at major exchanges every day.
+
+## 2. Exploratory Analysis
+
+#### 2.1 Frequency Domain Analysis of Bitcoin Price
+
+```{r}
+df <- read.csv("BTC.csv", header=TRUE)
+index = 1:nrow(df)
+price_loess <- loess(df$MarketPrice~index, span=1)
+plot(df$MarketPrice~index, type="l", main="Bitcoin Market Price", xlab="Index", ylab="Bitcoin Price")
+lines(price_loess$x, price_loess$fitted, type="l", col="red")
+```
+
+In addition to plotting the market price, we applied Loess smoothing upon the market price of Bitcoin, which shows an increasing trend. From the plot of price, we can also identify two high peaks in the past months. On the other hand, it looks like the trend is becoming more and more flat recently.
+
+```{r}
+spectrum(df$MarketPrice, main="Unsmoothed Periodogram of Bitcoin Price")
+spectrum(df$MarketPrice, spans=c(3,5,3),main="Smoothed Periodogram of Bitcoin Price")
+```
+
+To check whether there is seasonal effect, we plot the frequency domain of original data and smoothed data. From the periodgram of the Bitcoin market price, we can't identify any apparent peak. There is rumor that the Bitcoin has a cycle of 4 year, but our time series data doesn't cover such a long range. 
+
+#### 2.2 Data Plot of Return
+
+Then, we calculate the return of Bitcoin's price movement every day. It's calculated by $r_t=\frac{p_t}{p_{t-1}} - 1$.
+
+```{r  fig.height=5}
+plot(df$Return, type="l", main="Bitcoin Return", xlab="Date", ylab="Bitcoin Return")
+summary(df$Return)
+```
+
+The mean of the return is very close to 0 and there is no clear trend or change in variance. Therefore, we're going to follow the assumption that the return is stationary.
+
+#### 2.3 ACF Analysis of Return
+
+```{r}
+acf(df$Return, main="ACF of Return")
+```
+
+The return has a high ACF when lag is equals to 1 and 4, implying that there may some information that can be captured by ARIMA model. 
+
+## 3. Return Fitting
+
+#### 3.1 Periodogram
+
+```{r}
+spectrum(df$Return, main="Unsmoothed Periodogram")
+spectrum(df$Return, spans=c(3,5,3),main="Smoothed Periodogram")
+```
+
+There is no clear peak shown in the periodogram, and the return is stationary, therefore we're going to use an ARMA model.
+
+#### 3.2 ARIMA Fitting
+
+The ARMA(p,q) model is in the form of
+
+\[\begin{eqnarray}Y_n = \mu + \phi_1(Y_{n-1} - \mu) +...+ \phi_p(Y_{n-p} - \mu) + \epsilon_n + \psi_1\epsilon_{n-1} +...+ \psi_q\epsilon_{n-q}$\end{eqnarray}\]
+
+where \[\begin{eqnarray} \mu &=& {\mathbb{E}}[X_n] \\ {\phi}(x)&=&1-{\phi}_1 x-\dots -{\phi}_px^p, \\ {\psi}(x)&=&1+{\psi}_1 x+\dots +{\psi}_qx^q, \\ \epsilon_n&\sim&\mathrm{ iid }\, N[0,\sigma^2]. \end{eqnarray}\]
+
+The parameters for this model are \(\theta=({\phi}_{1:p},{\psi}_{1:q},\mu,\sigma^2)\)
+
+```{r fig.height=5}
+require(knitr)
+library(forecast)
+aic_table <- function(data, P, Q, I){
+  table <- matrix(NA, P+1, Q+1)
+  for(p in 0:P){
+    for(q in 0:Q){
+      tryCatch({
+          model = arima(data, order=c(p, 0, q))
+          table[p+1, q+1] <- model$aic
+      }, error = function(e) {})
+    }
+  }
+  dimnames(table) <- list(paste("AR", 0:P, sep=""), paste("MA", 0:Q, sep=""))
+  table
+}
+aa_aic_table <- aic_table(df$Return, 4, 4, 0)
+kable(aa_aic_table, digits=2, format="markdown", caption="AIC for Bitcoin Return")
+```
+
+The AIC shows that ARMA(1,1), AR(1,0) and MA(4) are good choices with low AIC value. Among them, we chose to work with ARMA(1,1) due to its relatively lower AIC and model simplicity.
+
+```{r}
+model <- arima(x = df$Return, order = c(1, 0, 1))
+autoplot(model, main="ARMA(1,1) Characteristic Roots")
+```
+
+All inverse characteristic roots of the model are in the unit circle, implying that our model is stable and invertible.
+
+#### 3.3 Residual Analysis
+
+```{r}
+acf(model$residuals, main="ACF of Redisuals from ARMA(1,1) Model")
+qqnorm(model$residuals, main="Test of Normality of Residual")
+qqline(model$residuals)
+```
+
+By plotting the ACF and Q-Q plot of the residual, we can see that our ARMA(1,1) effectively capture the time-series information of the return, but our assumption is violated. The Q-Q plot shows that the residual has a much heavier tail than normal distribution
+
+```{r, fig.height=10}
+par(mfrow=c(2,2))
+q = (1:length(model$residuals)) / (length(model$residuals) + 1)
+for(dof in c(1, 2, 4, 8))
+{
+  qqplot(model$residuals, qt(q, dof), sub=paste("Residualds' Q-Q Plot with T-distribution for dof ", dof))
+  qqline(model$residuals, qt(q, dof))
+}
+```
+
+It turns out that the a T-distribution with degree of freedom 4 can fit the tail of residuals well, but we may need some other tools to combine T-distribution with ARMA model.
+
+## 4. Profile Likelihood and Simulation
+
+#### 4.1 Paremeter Estimation
+```{r}
+model 
+K <- 50
+ma1 <- seq(from=0,to=1,length=K)
+ar1 <- seq(from=-1,to=0,length=K)
+profile_AR <- rep(NA,K)
+profile_MA <- rep(NA,K)
+for(k in 1:K) {
+  tryCatch({
+    profile_AR[k] <- logLik(arima(df$Return,order=c(1,0,1),
+                                      fixed=c(ar1[k], NA, NA)))
+  }, error = function(e) {})
+  
+  tryCatch({
+    profile_MA[k] <- logLik(arima(df$Return,order=c(1,0,1),
+                                      fixed=c(NA, ma1[k], NA)))
+  }, error = function(e) {})
+}
+plot(profile_AR~ar1,ty="l", main="Profile Likelihood of AR")
+plot(profile_MA~ma1,ty="l", main="Profile Likelihood of MA")
+
+ci_AR = ar1[which(profile_AR>max(profile_AR, na.rm=TRUE)-0.5 * qchisq(0.95, df=1))]
+ci_MA = ma1[which(profile_MA>max(profile_MA, na.rm=TRUE)-0.5 * qchisq(0.95, df=1))]
+```
+
+| Coefficient | $\theta_{mle}$ | MLE CI               | Profile Likelihood CI |
+| ----------- | -------------- | -------------------- | -------------- |
+| AR1         | $-0.6384$      | $[-1.1937, -0.0831]$ | $[-0.8776,0]$  |
+| MA1         | $0.5553$       | $[0.3316, 0.779]$    | $[0, 0.8367]$  |
+
+The profile likelihood give us a narrower confidence interval than MLE for AR1, while the confidence for MA1 is wider. It's essentially depends on the shape of likelihood function near to the MLE estimates.
+
+#### 4.2 Bootstrap Validation
+
+```{r fig.height=4}
+set.seed(123456)
+J <- 500
+params <- coef(model)
+ar <- params[grep("^ar",names(params))]
+ma <- params[grep("^ma",names(params))]
+intercept <- params["intercept"]
+sigma <- sqrt(model$sigma2)
+theta <- matrix(NA,nrow=J,ncol=length(params),
+                dimnames=list(NULL,names(params)))
+for(j in 1:J) {
+  try( {
+    Y_j <- arima.sim(
+      list(ar=ar,ma=ma),
+      n=length(df$Return),
+      sd=sigma
+    )+intercept
+    theta[j,] <- coef(arima(Y_j,order=c(1,0,1)))
+  } )
+}
+hist(theta[,1], breaks=50, xlim=c(-1, 0), main="Bootstrap Result of AR1 parameter of ARMA(1,1) ")
+hist(theta[,2], breaks=50, xlim=c(0,1), main="Bootstrap Result of MA1 parameter of ARMA(1,1) ")
+```
+
+To examine further, we also explored bootstrap of ARMA(1,1). However, the result from bootstrap is similar to the profile likelihood estimation result.
+
+#### 4.3 Simulation
+
+To generate a more intuitive understanding of the ARMA model, we're going to use the estimated return from the ARMA model to simulate the price of Bitcoin.
+
+```{r}
+set.seed(123456)
+ret <- arima.sim(
+  list(ar=ar,ma=ma),
+  n=length(df$Return),
+  sd=sigma
+)+intercept
+price <- cumprod(ret + 1) * df$MarketPrice[1]
+plot(df$MarketPrice~index, type="l", main="Bitcoin Market Price", xlab="Index", ylab="Bitcoin Price")
+lines(price_loess$x, price_loess$fitted, type="l", col="red")
+lines(price~index, col="blue", type="l")
+```
+
+It looks like the simulation from return from ARMA model is way different from the true price movement of Bitcoin. It generally follows the trend shown in the red line, but the high volatility behavior of the Bitcoin rarely occurs. We believe it's due to our model can't catch the heavy tail of the residuals.
+
+## 5. Relationship between Returns and Trade Volume
+
+Another interesting aspect to examine is whether there is sufficient evidence of a relationship between returns and other values such as trade volume. First, let's plot the trade volume over time.
+
+```{r}
+plot(df$TradeVolume~index, type="l", main="Bitcoin Trade Volume", xlab="Index", ylab="Trade Volume")
+```
+
+This data does not seem stationary, and it seems to be at a higher level around the time that the bitcoin price rose to a higher price. As a next step, let's examine some sample cross correlation functions between returns and trade volume.
+
+```{r}
+ccf(df$TradeVolume, df$Return, lag.max=30, main="ACF of Trade Volume and Return")
+```
+
+Interestingly, there seems to be a significant relationship between trade volume and the return 15 and 16 days earlier. In addition, all of the autocorrelation values for lags between 2 and 30 are positive, which seems unusual, but we should run statistical tests to check its significance.
+
+This motivates us to fit AIC models to the returns, where we additionally include the trade volume as an "independent" variable.
+
+```{r}
+aic_table <- function(data, P, Q){
+  table <- matrix(NA, P+1, Q+1)
+  for(p in 0:P){
+    for(q in 0:Q){
+      tryCatch({
+          model = arima(data, order=c(p, 0, q), xreg=df$TradeVolume)
+          table[p+1, q+1] <- model$aic
+      }, error = function(e) {})
+    }
+  }
+  dimnames(table) <- list(paste("AR", 0:P, sep=""), paste("MA", 0:Q, sep=""))
+  table
+}
+aa_aic_table <- aic_table(df$Return, 4, 4)
+kable(aa_aic_table, digits=2, format="markdown", caption="AIC with Trade Volume")
+```
+
+The models with the lowest AIC values in this table are ARMA(1,1) and ARMA(0,4). Although the ARMA(1,1) model has a slightly larger AIC value than ARMA(1,1), it is also a much simpler model, so we will examine the ARMA(1,1) model (i.e. regression with ARMA(1,1) errors).
+
+However, the ARMA(1,1) & Trade Volume AIC value, -3945.78, is actually greater than the AIC value of the ARMA model without considering trade volume -3947.55, so there is no significant evidence that considering the Trade Volume in this way improves the model.
+
+In conclusion for this section, it is better to leave the trading volume out of the model.
+
+## 6. Analysis of Return Square
+#### 6.1 ACF Analysis of Return Square
+The square of return can show how volatile the market in some way, because when there is huge change in the price, more people will make reaction, so that the price will move up and down in a dramatic way.
+
+```{r}
+plot(df$Return**2, main="Bitcoin Return Square", type="l", ylab = "Return Square")
+acf(df$Return**2, main="ACF of Return Square")
+```
+
+We also plot the ACF of the square of return, showing how dramatic the market is. The plot shows that there is a significant ACF when the lag is 1 and 7. There is also high ACF when the lag is 4 or 11. Hence, it looks like that there's a clustering affect for the return square.
+
+#### 6.2 Frequency Domain Analysis of Return Sqaure
+
+```{r}
+spectrum(df$MarketPrice**2, main="Unsmoothed Periodogram of Bitcoin Return Square")
+spectrum(df$MarketPrice, spans=c(3,5,3),main="Smoothed Periodogram of Bitcoin Return Square")
+```
+There is no high peak in the smoothed periodogram of the return sqaure, therefore there is no obvious cycle in it.
+
+#### 6.3 Model Fitting for Return Sqaure
+
+```{r}
+aic_table <- function(data, P, Q, I){
+  table <- matrix(NA, P+1, Q+1)
+  for(p in 0:P){
+    for(q in 0:Q){
+      tryCatch({
+          model = arima(data, order=c(p, 0, q))
+          table[p+1, q+1] <- model$aic
+      }, error = function(e) {})
+    }
+  }
+  dimnames(table) <- list(paste("AR", 0:P, sep=""), paste("MA", 0:Q, sep=""))
+  table
+}
+aa_aic_table <- aic_table(df$Return ** 2, 4, 4, 0)
+kable(aa_aic_table, digits=2, format="markdown", caption="AIC for Bitcoin Return Square")
+```
+We choose AR(1) model because it has a low AIC among all simple models.
+```{r}
+model = arima(df$Return ** 2, order=c(1, 0, 0))
+acf(model$residuals)
+qqnorm(model$residuals)
+qqline(model$residuals)
+```
+The ARMA model doesn't fit well for the return square, because when the ACF is out of the confidence interval when the lag is 4, 7, 11. What's more, the residuals is not fitting the normal distribution well, since it also has a much heavier tail.
+
+
+## 7. Conclusion
+
+In this report, we have analyzed Bitcoin price and return of Bitcoin’s daily price movement. We first fitted ARMA(1,1) model to examine the time series of the return. We have also discovered that the residual has a heavy tail. The simulation we have ran using our result from the ARMA(1,1) model did not successfully capture the actual price movement of Bitcoin. We believe this is again due the heavy residual tail influencing the model. Because T distribution with degree of freedom 4 seem to compesate such problem, we believe further investigation is needed to improve the model in combining that with ARMA(1,1).
+
+Alertantively, we could find variables to add into the model to improve such problem. So, we looked into the relationship between returns and trade volume to further explore what influences Bitcoin. From plotting trade volume, we were able to see it increasing similarly to the price, so we included the trade volume to the model. However, AIC value of ARMA(1,1) including trade volume is greater than that of the ARMA model without trade volume.
+
+Another approach taken was examining the squared return instead. However, the ARMA did not fit well and again the heavier tail of residual problem was still remaining. Bitcoin price is influenced by various factors including its supply and demand, competing cryptocurrencies, etc. Therefore, there are various possible studies that could be added from our current models and modfications.
+
+
+## Reference
+
+- [STATS 531 Course Materials for 2022 Winter](https://ionides.github.io/531w22/)
+- [Time Series Analysis for Log Returns of Nasdaq](https://ionides.github.io/531w20/midterm_project/project16/midterm-project.html)
+- [STATS 531 Midterm Project : Bitcoin Historical Data](https://ionides.github.io/531w21/midterm_project/project01/project.html)

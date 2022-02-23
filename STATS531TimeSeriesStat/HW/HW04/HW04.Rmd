@@ -1,0 +1,73 @@
+---
+title: "HW04"
+author: "Chongdan Pan"
+date: "2022/2/11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 4.1
+a. According to the slides, we have
+$$
+\lambda(f)=\sigma^2|\frac{\psi(e^{2\pi if})}{\phi(e^{2\pi if})}|^2=\sigma^2\frac{1}{|1-1.5e^{2\pi if}+0.8e^{4\pi if}|^2}
+\\
+\lambda(f)=\frac{\sigma^2}{(1-1.5e^{2\pi if}+0.8e^{4\pi if})(1-1.5e^{-2\pi if}+0.8e^{-4\pi if})}\\
+\lambda(f)=\frac{\sigma^2}{3.89+0.8e^{-4i\pi f}+0.8e^{4i\pi f}-2.7e^{-2i\pi f}-2.7e^{2i\pi f}}\\
+\lambda(f)=\frac{\sigma^2}{3.89+1.6\cos(4\pi f)-5.4\cos(2\pi f)}
+$$
+```{r}
+
+y <- arima.sim(list(ar=c(1.5, -0.8)), n=100)
+spectrum(y, method="ar")
+acf(y)
+```
+b. According to the slides, we have
+$$
+\lambda(f)=\sigma^2|\frac{\psi(e^{2\pi if})}{\phi(e^{2\pi if})}|^2=\sigma^2|1+e^{2\pi if}+e^{4\pi if}|^2
+\\
+\lambda(f)=\sigma^2(1+e^{2\pi if}+e^{4\pi if})(1+e^{-2\pi if}+e^{-4\pi if})\\
+\lambda(f)=\sigma^2(3+2e^{2\pi if}+2e^{-2\pi if}+e^{4\pi if}+e^{-4\pi if})\\
+\lambda(f)=\sigma^2(3+4\cos(2\pi f)+2\cos(4\pi f))
+$$
+
+```{r}
+y <- arima.sim(list(ma=c(1, 1)), n=100)
+spectrum(y, method="ar")
+acf(y)
+```
+
+c. For part a, it looks like that the spectrum has a peak near $f=0.1$, and it's monotonous on both sides. In the ACF plot, as we learned before, an AR(2) model is good at fitting oscillating ACF. For part b, it looks like that both the spectrum and ACF are oscillating. However, the spectrum has a valley near $f=0.35$. I also noticed that the spectrum is using an AR(15) model for the calculation, which means AR model with large order can behave in a similar pattern as low order MA model.
+
+### 4.2
+
+To get a general idea about the idea, I firstly plot the raw data, spectrum, as well as ACF.
+
+```{r}
+df <- read.table("https://ionides.github.io/531w22/hw04/sunspots.txt", header=TRUE)
+data = df$Number
+plot(data, type="l")
+spectrum(data)
+acf(data)
+```
+
+From the plot of original data, it looks like that the data have a period around 100 months However, it's very hard to identify the specific frequency from the unsmooth periodogram, therefore I plot the ACF function to set the window for spectrum smoothing.
+
+```{r}
+s1 <- spectrum(data, span=c(34, 34))
+s1$freq[which.max(s1$spec)]
+```
+
+```{r}
+s2 <- spectrum(data, method="ar")
+s2$freq[which.max(s2$spec)]
+```
+
+Both estimation give us similar max frequency. It's interesting that the AR method also use order 34 for the estimation, meaning that the result from AIC is consistent to my selection from ACF. The frequency is about 0.0075 cycle/month, so the period is close to 11.11 year. The result is conformed to my knowledge, so the smoothing and estimation is reliable.
+
+### Reference
+- [Slides about Chapter 7](https://ionides.github.io/531w22/07/index.html)
+
+- [Slides about Chapter 8](https://ionides.github.io/531w22/08/index.html)

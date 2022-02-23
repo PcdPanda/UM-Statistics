@@ -21,7 +21,8 @@ x$Low[is.na(x$Low)] <- round(mean(x$Low, na.rm=TRUE),2)
 plot(Low~Year,data=x,type="l",main="Ann Arbor Jan Low Temperature")
 # global <- read.table(file="GlobalTemperature.txt",header=TRUE)
 global <- read.table(file="http://ionides.github.io/531w22/hw03/Global_Temperature.txt",header=TRUE)
-north <- read.csv(file="NothernTemperature.csv", header=TRUE)
+# north <- read.csv(file="NothernTemperature.csv", header=TRUE)
+north <- read.table(file="https://github.com/PANDApcd/UM-Statistics/raw/master/STATS531TimeSeriesStat/HW/HW03/NothernTemperature.csv",header=TRUE)
 ```
 It turns out that there is a missing value in the temperature of Ann Arbor, so I use its mean value to fill the NaN. In this way, the temperature range from $-22\sim19$ with mean $2.74$, and standard deviation $7.5$.
 
