@@ -1,3 +1,18 @@
+### 要点
+
+- 分布
+  1. GPD的依赖分布$P[X\le x|X\ge\tilde{VaR}]\sim GPD(\tilde{VaR},\hat\xi,\hat\sigma+\hat\xi(\tilde{VaR}-u))$
+  2. Jarque-Bera Test检验tail的normality,但是数据多很容易reject
+- semi-parametric
+  - Threshold的选取要尽量大,但区域中shape $\xi$需要stable
+  - 存在assumption即return必须是i.i.d(经常被violate)
+- copula
+  1. 计算copula找随机变量关系,再利用单调性回带
+  2. 正态copula 没有tail dependence
+  3. copula选择需要关注tail拟合
+  4. 使用AIC/BIC来选择最优模型
+  5. copula不可能是一个点,必定是线
+
 ### 1. 基本概念
 
 ##### 收益率
@@ -24,9 +39,9 @@
 
 收益率不同分布下的ES
 
-| 正态分布                                     | Dexp                                | GPD                              |
-| -------------------------------------------- | :---------------------------------- | -------------------------------- |
-| $\mu+\sigma\frac{f(F^{-1}(\alpha))}{\alpha}$ | $-\mu+\frac{1-\ln2\alpha}{\lambda}$ | $VaR_q+\frac{\sigma}{\xi q^\xi}$ |
+| 正态分布                                     | Dexp                                | GPD                                                          |
+| -------------------------------------------- | :---------------------------------- | ------------------------------------------------------------ |
+| $\mu+\sigma\frac{f(F^{-1}(\alpha))}{\alpha}$ | $-\mu+\frac{1-\ln2\alpha}{\lambda}$ | $VaR_q+\frac{\sigma}{\xi q^\xi}=\tilde{VaR_q}+\frac{\hat\sigma+\xi(\tilde{VaR_q}-u)}{1-\hat\xi}$ |
 
 ##### 时间序列数据
 
@@ -142,7 +157,7 @@ $$
 
 ### 4. 单变量分布
 
-##### 正态分布 N($\mu,\sigma$)
+##### 正态分布 N($\mu,\sigma^2$)
 
 $$
 f_X(x)=\frac{1}{\sqrt{2\pi}\sigma}\exp(-\frac{(x-\mu)^2}{2\sigma^2})
@@ -155,7 +170,7 @@ f(x)=\begin{cases}\lambda e^{-\lambda x} & x\ge 0\\0\end{cases}\\
 F(x)=1-e^{-\lambda x}
 $$
 
-- $\mu=\sigma=\frac{1}{\mu}$
+- $\mu=\sigma=\frac{1}{\lambda}$
 
 ##### 双指数分布 Dexp($\mu,\lambda$)
 
