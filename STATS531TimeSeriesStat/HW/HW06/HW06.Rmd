@@ -1,0 +1,181 @@
+---
+title: "HW06"
+author: "Chongdan Pan"
+date: "2022/3/18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align="center", error=FALSE, fig.width=10)
+```
+
+### Problem 6.1
+
+Explore the data
+
+```{r results="hide"}
+library(doParallel)
+library(doRNG)
+library(tidyverse)
+library(pomp)
+library(ggplot2)
+registerDoParallel()
+registerDoRNG(2488820)
+
+# Explore the data
+read_csv(paste0("./Measles_Consett_1948.csv")) %>%
+  select(week,reports=cases) -> meas
+meas %>% as.data.frame() %>% head()
+meas %>% ggplot(aes(x=week,y=reports)) + geom_line()+ geom_point()
+```
+sim_sir(c(Beta=7.5,mu_IR=0.5,rho=0.5,k=10,eta=0.03,N=38000))
+sim_sir(c(Beta=28,mu_IR=0.3,rho=0.5,k=10,eta=0.03,N=38000))
+sim_sir(c(Beta=28,mu_IR=0.3,rho=0.5,k=10,eta=0.03,N=38000))
+sim_sir(c(Beta=28,mu_IR=0.3,rho=0.55,k=500,eta=0.03,N=38000))
+
+Simulation of POMP model for following parameters
+
+| Parameter | $\beta$ | $\mu_{IR}$ | $\rho$ | $k$  | $\eta$ | $N$   |
+| --------- | ------- | ---------- | ------ | ---- | ------ | ----- |
+| Figure 1  | 7.5     | 0.5        | 0.5    | 10   | 0.03   | 38000 |
+| Figure 2  | 28      | 0.3        | 0.5    | 10   | 0.03   | 38000 |
+| Figure 3  | 28      | 0.3        | 0.5    | 10   | 0.03   | 38000 |
+| Figure 4  | 28      | 0.3        | 0.55   | 500  | 0.03   | 38000 |
+
+Based on the previous result from slides, I increase the value of $\beta$ so that we have more reports. Then I slightly decrease the $\mu_IR$ so that the peak won't come so quickly. In the end, I changed the parameters for report gerneraton so that there is no too much volatility.
+
+
+```{r results="hide"}
+# Define the Pomp Model
+
+sir_step <- Csnippet("
+  double dN_SI = rbinom(S,1-exp(-Beta*I/N*dt));
+  double dN_IR = rbinom(I,1-exp(-mu_IR*dt));
+  S -= dN_SI;
+  I += dN_SI - dN_IR;
+  R += dN_IR;
+  H += dN_IR;
+  ")
+
+sir_rinit <- Csnippet("
+  S = nearbyint(eta*N);
+  I = 1;
+  R = nearbyint((1-eta)*N);
+  H = 0;
+  ")
+
+sir_dmeas <- Csnippet("
+  lik = dnbinom_mu(reports,k,rho*H,give_log);
+  ")
+
+sir_rmeas <- Csnippet("
+  reports = rnbinom_mu(k,rho*H);
+  ")
+
+meas %>%
+  pomp(
+        times="week",t0=0,
+        rprocess=euler(sir_step,delta.t=1/7),
+        rinit=sir_rinit,
+        rmeasure=sir_rmeas,
+        dmeasure=sir_dmeas,
+        accumvars="H",
+        statenames=c("S","I","R","H"),
+        paramnames=c("Beta","mu_IR","N","eta","rho","k")
+       ) -> measSIR
+
+### Analyze the result
+sim_sir <- function (params){
+  measSIR %>% simulate(
+    params=params,
+    nsim=20,format="data.frame",include.data=TRUE
+  ) -> sims
+
+  sims %>%
+    ggplot(aes(x=week,y=reports,group=.id,color=.id=="data"))+
+    geom_line()+
+    guides(color=FALSE)
+}
+
+sim_sir(c(Beta=7.5,mu_IR=0.5,rho=0.5,k=10,eta=0.03,N=38000))
+sim_sir(c(Beta=28,mu_IR=0.3,rho=0.5,k=10,eta=0.03,N=38000))
+sim_sir(c(Beta=28,mu_IR=0.3,rho=0.5,k=10,eta=0.03,N=38000))
+sim_sir(c(Beta=28,mu_IR=0.3,rho=0.55,k=500,eta=0.03,N=38000))
+```
+
+### 6.2 
+
+Simulation of POMP model for following parameters.
+
+| Parameter  | $\beta$ | $\mu_{IR}$ | $\rho$ | $k$  | $\eta$ | $N$   | $\mu_{EI}$ |
+| ---------- | ------- | ---------- | ------ | ---- | ------ | ----- | ---------- |
+| Figure 1   | 28      | 0.3        | 0.55    | 500  | 0.03   | 38000 | 0.5        |
+| Figure 2   | 40      | 0.35        | 0.5    | 500  | 0.03   | 38000 | 0.9    |
+
+Firstly, I starts with the parameters from previous question and setting the transition rate from exposed to infectious $\mu_{EI}$ to be 0.5. The result is not good enough because the peak is low and coming too late. What's more, there are too much noise after the peak. Therefore, I tuned the parameters of $\mu_{EI},\mu_{IR},\rho$ to make it better.
+
+```{r results="hide"}
+sir_step <- Csnippet("
+  double dN_SE = rbinom(S,1-exp(-Beta*I/N*dt));
+  double dN_EI = rbinom(E,1-exp(-mu_EI*dt));
+  double dN_IR = rbinom(I,1-exp(-mu_IR*dt));
+  S -= dN_SE;
+  E += dN_SE - dN_EI;
+  I += dN_EI - dN_IR;
+  R += dN_IR;
+  H += dN_IR;
+  ")
+
+sir_rinit <- Csnippet("
+  S = nearbyint(eta*N);
+  E = 0;
+  I = 1;
+  R = nearbyint((1-eta)*N);
+  H = 0;
+  ")
+
+sir_dmeas <- Csnippet("
+  lik = dnbinom_mu(reports,k,rho*H,give_log);
+  ")
+
+sir_rmeas <- Csnippet("
+  reports = rnbinom_mu(k,rho*H);
+  ")
+
+meas %>%
+  pomp(
+        times="week",t0=0,
+        rprocess=euler(sir_step,delta.t=1/7),
+        rinit=sir_rinit,
+        rmeasure=sir_rmeas,
+        dmeasure=sir_dmeas,
+        accumvars="H",
+        statenames=c("S","E","I","R","H"),
+        paramnames=c("Beta","mu_IR","N", "eta", "rho", "k", "mu_EI")
+       ) -> measSIR
+
+### Analyze the result
+sim_seir <- function (params){
+  measSIR %>% simulate(
+    params=params,
+    nsim=20,format="data.frame",include.data=TRUE
+  ) -> sims
+
+  sims %>%
+    ggplot(aes(x=week,y=reports,group=.id,color=.id=="data"))+
+    geom_line()+
+    guides(color=FALSE)
+}
+
+
+sim_seir(c(Beta=28,mu_IR=0.3,rho=0.55,k=500,eta=0.03,N=38000,mu_EI=0.5))
+sim_seir(c(Beta=40,mu_IR=0.35,rho=0.5,k=500,eta=0.03,N=38000,mu_EI=0.9))
+```
+
+### Refernce
+
+- [Slides about Chapter 12](https://ionides.github.io/531w22/12/index.html)
+
+- [Compartmental models in epidemiology](https://en.wikipedia.org/wiki/Compartmental_models_in_epidemiology)
+
+- [Previous Solution](https://ionides.github.io/531w21/hw06/sol06.html)

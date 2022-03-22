@@ -1,0 +1,145 @@
+---
+title: "HW07"
+author: "Chongdan Pan"
+date: "2022/3/18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, fig.align="center", error=FALSE, fig.width=10, results="hide")
+```
+
+### Problem 1
+
+(a)
+```{r}
+aapl_df = read.csv("../AAPL_March16_2020_March16_2022.csv", header=TRUE)
+amzn_df = read.csv("../AMZN_March16_2020_March16_2022.csv", header=TRUE)
+googl_df = read.csv("../GOOGL_March16_2020_March16_2022.csv", header=TRUE)
+nasdaq_df = read.csv("../Nasdaq_March16_2000_March 16_2022.csv", header=TRUE)
+mu_f = 0.025 / 253
+dates = nrow(aapl_df)
+
+aapl_ret = aapl_df$Adj.Close[2:dates] / aapl_df$Adj.Close[1:dates-1] - 1
+amzn_ret = amzn_df$Adj.Close[2:dates] / amzn_df$Adj.Close[1:dates-1] - 1
+googl_ret = googl_df$Adj.Close[2:dates] / googl_df$Adj.Close[1:dates-1] - 1
+nasdaq_ret = nasdaq_df$Adj.Close[2:dates] / nasdaq_df$Adj.Close[1:dates-1] - 1
+
+aapl_exc = aapl_ret - mu_f
+amzn_exc = amzn_ret - mu_f
+googl_exc = googl_ret - mu_f
+nasdaq_exc = nasdaq_ret - mu_f
+lm(aapl_exc ~ nasdaq_exc)
+lm(amzn_exc ~ nasdaq_exc)
+lm(googl_exc ~ nasdaq_exc)
+aapl_por = 1.085 ^ 2 * var(nasdaq_ret) / var(aapl_ret)
+amzn_por = 0.962 ^ 2 * var(nasdaq_ret) / var(amzn_ret)
+googl_por = 0.962 ^ 2 * var(nasdaq_ret) / var(googl_ret)
+```
+We have the following result
+
+
+|        | $\alpha$ | $\beta$ | Portion of Market Variance |
+| ------ | -------- | ------- | -------------------------- |
+| Apple  | 6.3E-4   | 1.085   | 0.669                      |
+| Amazon | 1.33E-6  | 0.962   | 0.513                      |
+| Google | 5.99E-4  | 0.962   | 0.637                      |
+
+
+
+(b)
+For the empirical variance, we have
+
+```{r}
+ret_df <- data.frame(aapl_ret, amzn_ret, googl_ret)
+cov(ret_df)
+```
+
+|        | Apple   | Amazon  | Google  |
+| ------ | ------- | ------- | ------- |
+| Apple  | 4.29E-4 | 2.66E-4 | 2.43E-4 |
+| Amazon | 2.66E-4 | 4.39E-4 | 2.32E-4 |
+| Google | 2.43E-4 | 2.32E-4 | 3.54E-4 |
+
+For the covariance from regression, we have
+
+|        | Apple    | Amazon   | Google   |
+| ------ | -------- | -------- | -------- |
+| Apple  | 2.87E-4  | 2.547E-4 | 2.547E-4 |
+| Amazon | 2.547E-4 | 2.258E-4 | 2.258E-4 |
+| Google | 2.547E-4 | 2.258E-4 | 2.258E-4 |
+
+There is obvious difference between the empirical covariance and regression-derived covariance, I think it's due to the fact that our assumption is not valid. The value of $\alpha$ is not negligible and the errors may be dependent.
+
+### Problem 2
+
+(a)
+```{r results="show", fig.height=15}
+ts_aapl <- ts(aapl_df$Adj.Close)
+ts_amzn <- ts(amzn_df$Adj.Close)
+ts_googl <- ts(googl_df$Adj.Close)
+ts_nasdaq <- ts(nasdaq_df$Adj.Close)
+ts_aapl_ret <- ts(aapl_ret)
+ts_amzn_ret <- ts(amzn_ret)
+ts_googl_ret <- ts(googl_ret)
+ts_nasdaq_ret <- ts(nasdaq_ret)
+par(mfrow=c(5,1))
+plot(ts_aapl, col="red")
+plot(ts_amzn, col="orange")
+plot(ts_googl, col="blue")
+plot(ts_nasdaq, col="green")
+plot(ts_aapl_ret, col="red")
+lines(ts_amzn_ret, col="orange")
+lines(ts_googl_ret, col="blue")
+lines(ts_nasdaq_ret, col="green")
+```
+For Apple and Google, the plots shows a similar rising for both of them. It makes sense since they have similar portion of market variance. While for Amazon, there are more drawbacks and the rising trend is not so obvious after the 100th timestamp. It's also reflected in the lower portion of market variance. Now, all stocks are starting to decrease, as shown in the Nasdaq Index, since they all have a $\beta$ close to 1. 
+
+(b)
+```{r results="show", fig.height=10}
+par(mfrow=c(4,1))
+acf(ts_aapl, col="red")
+acf(ts_amzn, col="orange")
+acf(ts_googl, col="blue")
+acf(ts_nasdaq, col="green")
+```
+The plots show that there is an extremely high ACF even after a lag of 25. It makes perfect sense since it's unlikely for the price to change too much in a short interval. Therefore, the close price is not stationary since the mean is not zero and there is a trend.
+
+(c)
+```{r results="show", fig.height=10}
+par(mfrow=c(4,1))
+acf(ts_aapl_ret, col="red")
+acf(ts_amzn_ret, col="orange")
+acf(ts_googl_ret, col="blue")
+acf(ts_nasdaq_ret, col="green")
+```
+Most of ACF lie in the confidence interval, since return doesn't have too much relation to each other in time. Therefore, I'd conclude that the return is stationary.
+
+
+### Problem 3
+
+(a)
+$$
+\mu_X=\mu_Z-\mu_Y\\
+\gamma_X(h)=\text{Cov}(Y_{t+h}-Z_{t+h}, Y_t-Z_t)=\gamma_Y(h)+\gamma_Z(h)=\frac{\sigma_Y^2\alpha_Y^{|h|}}{1-\alpha_Y^2}+\frac{\sigma_Z^2\alpha_Z^{|h|}}{1-\alpha_Z^2}\\
+\rho_X(h)=\frac{\gamma_X(h)}{\gamma_X(0)}=\frac{(1-\alpha_Z^2)\alpha_Y^{|h|}\sigma_Y^2+(1-\alpha_Y^2)\alpha_Z^{|h|}\sigma_Z^2}{(1-\alpha_Z^2)\sigma_Y^2+(1-\alpha_Y^2)\sigma_Z^2}
+$$
+
+(b)
+$$
+\mu_X=\mu_Y+\mu_Y\mu_Z\\
+\gamma_X(h)=\text{Cov}(Y_{n+h}+Y_{n+h}Z_{n+h}, Y_n+Y_nZ_n)=\gamma_Y(h)+\gamma_{YZ}(h)+\text{Cov}(Y_{n+h}, Y_nZ_n)+\text{Cov}(Y_n, Y_{n+h}Z_{n+h})\\
+\text{Cov}(Y_{n+h}, Y_nZ_n)=E[(Y_{n+h}-\mu_Y)(Y_nZ_n-\mu_Y\mu_Z)]=\mu_Z\gamma_Y(h)=\text{Cov}(Y_n, Y_{n+h}Z_{n+h})\\
+\gamma_{YZ}(h)=\text{Cov}(Y_{n+h}Z_{n+h}, Y_nZ_n)=\text{Cov}(\alpha_Y\alpha_ZY_{n+h-1}Z_{n+h-1}+\alpha_ZZ_{n+h-1}\epsilon_Y+\alpha_YY_{n+h-1}\epsilon_Z+\epsilon_Y\epsilon_X, Y_nZ_n)\\
+\gamma_{YZ}(h)=(\alpha_Y\alpha_Z)^{|h|}\text{Var}(Y_nZ_n)=(\alpha_Y\alpha_Z)^{|h|}(E[(Y_nZ_n)^2]-E[(Y_nZ_n)]^2)=(\alpha_Y\alpha_Z)^{|h|}(E[Y_n^2]E[Z_n^2]-\mu_Y^2\mu_Z^2)\\
+E[Y_n^2]E[Z_n^2]=(\gamma_Y(0)+\mu_Y^2)(\gamma_Z(0)+\mu_Z^2)\\
+\gamma_{YZ}(h)=(\alpha_Y\alpha_Z)^{|h|}(\frac{\sigma_Y^2\sigma_Z^2}{(1-\alpha_Y^2)(1-\alpha_Z^2)}+\frac{\sigma_Y^2\mu_Z^2}{1-\alpha_Y^2}+\frac{\sigma_Z^2\mu_Y^2}{1-\alpha_Z^2})\\
+\gamma_X(h)=(1+2\mu_Z)\frac{\sigma_Y^2\alpha_Y^{|h|}}{1-\alpha_Y^2}+(\alpha_Y\alpha_Z)^{|h|}(\frac{\sigma_Y^2\sigma_Z^2}{(1-\alpha_Y^2)(1-\alpha_Z^2)}+\frac{\sigma_Y^2\mu_Z^2}{1-\alpha_Y^2}+\frac{\sigma_Z^2\mu_Y^2}{1-\alpha_Z^2})
+$$
+
+(c)
+
+$$
+\mu_X=2\mu_Y\\
+\gamma_X(h)=\text{Cov}(Y_{n+h}+Y_{n+1+h},Y_n+Y_{n+1})=2\gamma_Y(0)+\gamma_Y(h+1)+\gamma_Y(|h-1|)=\frac{\sigma_Y^2}{1-\alpha_Y^2}(2+\alpha_Y^{|h+1|}+\alpha_Y^{|h-1|})\\
+$$

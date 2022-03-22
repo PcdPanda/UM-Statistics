@@ -1,0 +1,109 @@
+---
+title: "HW05"
+author: "Chongdan Pan"
+date: "2022/3/2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Since the random variable used for each probability function is clearly represented in the arguments, I'm omitting the subscription of the functions.
+
+### 5.1 Derive the identity
+Based on the definition of Markov process and conditional probability, we have
+$$
+f(x_{0:N})=f(x_N|x_{0:N-1})f(x_{0:N-1})=f(x_N|x_{N-1})f(x_{0:N-1})
+$$
+By applying the formula recursively, we have 
+$$
+f(x_{0:N})=f(x_N|x_{N-1})f(x_{0:N-1})=f(x_0)\prod_{t=1}^Nf(x_t|x_{t-1})
+$$
+
+### 5.2 Derive the prediction 
+
+Based on Bayies theorem, we have 
+
+
+$$
+f_(x_n|y^*_{1:n-1})=\int_{x_{n-1}}f_(x_n,x_{n-1}|y^*_{1:n-1})\mathrm dx_{n-1}=\\\int f(x_n|x_{n-1},y^*_{1:n-1})f(x_{n-1}|y^*_{1:n-1})\mathrm dx_{n-1}
+$$
+
+Since $f(x_n|x_{n-1},y^*_{1:n-1})=f(x_n|x_{n-1})$
+
+we have
+$$
+f(x_n|y^*_{1:n-1})=\int f(x_{n-1}|y^*_{1:n-1})f(x_n|x_{n-1})\mathrm dx_{n-1}
+$$
+
+### 5.3 Derive the filtering
+
+- For [P5]
+
+$$
+f(x_n|y^*_{1:n})=\frac{f(x_n,y^*_n|y^*_{1:n-1})}{f(y^*_n|y^*_{1:n-1})}=\frac{f(y^*_n|x_n,y^*_{1:n-1})f(x_n|y^*_{1:n-1})}{f(y^*_n|y^*_{1:n-1})}
+$$
+
+Since we have $f(y^*_n|x_n,y^*_{1:n-1})=f(y^*_n|x_n)$
+$$
+f(x_n|y^*_{1:n})=\frac{f(x_n|y^*_{1:n-1})f(y^*_n|x_n)}{f(y^*_n|y^*_{1:n-1})}
+$$
+
+- For [P6]
+
+$$
+f(y^*_n|y^*_{1:n-1})=\int f(y^*_n|x_n,y^*_{1:n-1})f(x_n|y^*_{1:n-1})\mathrm dx_n
+$$
+
+Since $f(y^*_n|x_n,y^*_{1:n-1})=f(y^*_n|x_n)$
+
+We have 
+$$
+f(y^*_n|y^*_{1:n-1})=\int f(x_n|y^*_{1:n-1})f(y^*_n|x_n)\mathrm dx_n
+$$
+
+### 5.4 Derive the backward recursion
+
+- For [P7]
+
+$$f(y^*_{n:N}|x_n)=f(y^*_n|y^*_{n+1:N},x_n)f(y^*_{n+1:N}|x_n)$$
+
+Since $f(y^*_n|y^*_{n+1:N},x_n)=f(y^*_n|x_n)$
+
+We have 
+
+$$
+f(y^*_{n:N}|x_n)=f(y^*_n|x_n)f(y^*_{n+1:N}|x_n)
+$$
+
+- For [P8]
+
+$$
+f(y^*_{n+1:N}|x_n)=\int f(y^*_{n+1:N}|x_n,x_{n+1})f(x_{n+1}|x_n)\mathrm d x_{n+1}
+$$
+
+Since $f(y^*_{n+1:N}|x_n,x_{n+1})=f(y^*_{n+1:N}|x_{n+1})$
+
+we have 
+
+$$
+f(y^*_{n+1:N}|x_n)=\int f(y^*_{n+1:N}|x_{n+1})f(x_{n+1}|x_n)\mathrm d x_{n+1}
+$$
+
+### 5.5 Derive the smoothing
+
+$$
+f(x_n|y^*_{1:N})=\frac{f(x_n,y^*_{n:N}|y^*_{1:n-1})}{f(y^*_{n:N}|y^*_{1:n-1})}=\frac{f(x_n|y^*_{1:n-1})f(y^*_{n:N}|x_n,y^*_{1:n-1})}{f(y^*_{n:N}|y^*_{1:n-1})}
+$$
+
+Since $f(y_{n:N}|x_n,y_{1:n-1})=f(y_{n:N}|x_n)$
+
+We have 
+$$
+f(x_n|y^*_{1:N})=\frac{f(x_n|y^*_{1:n-1})f(y^*_{n:N}|x_n)}{f(y^*_{n:N|y^*_{1:n-1}})}
+$$
+
+### Refernce
+
+- [Slides about Chapter 10](https://ionides.github.io/531w22/10/index.html)

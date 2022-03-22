@@ -222,7 +222,8 @@ $$
 5. 绘制copula的等高线,分析估计质量
 6. 从copula生成模拟数据,并获得不同权重时的$VaR$
 
-	### 3.2 风险资产模型
+
+### 3.2 风险资产模型
 
 ##### 定义
 
@@ -238,6 +239,13 @@ $$
 - 可能还有分散投资,不能做空等附加条件
 - 生成的结果为<u>有效边界: 在固定资产的方差$\sigma$的情况下,可以获得的最大收益$\mu$</u>
 
+##### 风险资产收益率/方差估计
+
+- 使用经验数据对资产间的收益率和协方差进行估计,但是<u>会引入bias</u>
+- 使用Bootstrap对样本收益率,方差和最优夏普率进行估计,置信区间是$[2\hat\theta-q_U,2\hat\theta-q_L]$ 
+
+### 3.3 模型最优化
+
 ##### 无风险资产混合投资
 
 - 在资产组合中引入了收益率为$\mu_f$的无风险资产
@@ -251,19 +259,104 @@ $$
   - 收益率$\mu=\mu_f+w(\mu_p-\mu_f)$
   - 方差$\sigma=w\sigma_p$
 
-##### 最大化夏普比率
+##### <u>最大化Portfolio夏普比率流程</u>
 
-- 对于双资产混合无风险模型,令$v_1=\mu_1-\mu_f,v_2=\mu_2-\mu_f$,则第一个资产的权重有
-  $$
-  w_T=\frac{v_1\sigma_2^2-v_2\rho_{12}\sigma_1\sigma_2}{v_1\sigma_2^2+v_2\sigma_1^2-(v_1+v_2)\rho_{12}\sigma_1\sigma_2}
-  $$
+1. 根据无风险资产收益率$\mu_f$,最大化风险资产的夏普比率
+   $$
+   w_T=\frac{v_1\sigma_2^2-v_2\rho_{12}\sigma_1\sigma_2}{v_1\sigma_2^2+v_2\sigma_1^2-(v_1+v_2)\rho_{12}\sigma_1\sigma_2}\quad(v_1=\mu_1-\mu_f,v_2=\mu_2-\mu_f)
+   $$
 
-- 在最大化夏普比率的基础上,根据资产模型的方差限制,获得无风险资产的配置
+2. 根据$w_T$获得风险资产标准差$\sigma_T,\mu_T$
 
-1. 根据$w_T$获得风险资产标准差$\sigma_T,\mu_T$
-2. 根据给定的风险目标,获得风险资产总占比权重 $w=\frac{\sigma_{target}}{\sigma_T}$
-3. 或者根据给定的收益率目标,获得风险资产总比权重$w=\frac{\mu_{target}-\mu_f}{\mu_T-\mu_f}$
+3. 根据给定的风险/收益率约束,获得风险资产占比
+   - 给定风险约束,则风险资产总占比权重 $w=\frac{\sigma_{target}}{\sigma_T}$
+   - 给定收益率目标,则获得风险资产总比权重$w=\frac{\mu_{target}-\mu_f}{\mu_T-\mu_f}$
+
 4. 每个风险资产的比重为$w\cdot w_T$
+
+### 3.4 <u>混合资产定价模型 (CAPM)</u>
+
+##### Capital Market Line(CML)
+
+- 通过无风险收益率和波动率描述资产收益率
+
+- 说明了夏普率相等,即增加风险资产配比时,超额收益永远和风险成正比
+  $$
+  \mu_R=\mu_f+\frac{\mu_M-\mu_f}{\sigma_M}\sigma_R\leftrightarrow\frac{\mu_M-\mu_f}{\sigma_M}=\frac{\mu_R-\mu_f}{\sigma_R}
+  $$
+
+- 给定$\text{VaR}_q$和收益率$\mu_m$的$q$分位数获得配比资产$w$
+  $$
+  P((1-w)\mu_f+w\mu_m\leq-\tilde{VaR}_q)=q\\
+  P(\mu_m\leq\frac{(w-1)\mu_f-\tilde{VaR}_q}{w})=q\\
+  w=\frac{\tilde{VaR}_q+\mu_f}{\mu_f-\Phi_q}
+  $$
+
+##### $\beta$和Security Market Line (SML)
+
+- 对于任意资产,$\beta_R$的定义和估计值分别有
+  $$
+  \beta_R=\frac{\text{Cov}(R,R_M)}{\sigma_M^2}
+  $$
+
+- 通过$\beta$可以给任意资产定义Security Market Line: $\mu_R-\mu_f=\beta_R(\mu_M-\mu_f)$
+
+- 通过对数据做线性回归,可以估计$\hat\beta_R$,并带入到SML中估计收益率
+  $$
+  \hat\beta_R=\frac{\sum_{t=1}^T(R_t-\bar R)(R_{Mt}-\bar R_M)}{\sum_{t=1}^T(R_{Mt}-\bar R_M)^2}
+  $$
+
+- 和1做对比$\beta_R$越大,则风险越高
+
+##### 资产收益率拟合
+
+- 通过线性回归,可以对$i$资产收益率进行拟合
+  $$
+  \mu_i-\mu_f=\alpha_i+\beta_i(\mu_m-\mu_f)+\epsilon_i
+  $$
+
+- 在CAPM假设成立的情况下,$\alpha_i$应该为0,如果$\alpha_i$大于0,则说明$\mu_i$被低估了
+- 通过分析$\beta_i$的$R^2$,可以验证收益率的来源是市场还是误差
+
+### 3.5 风险分析
+
+##### 风险计算
+
+- 对于资产$i$,则有$\sigma_i^2=\beta_i^2\sigma_M^2+\sigma_\epsilon^2$
+  - 市场系统性风险: $\beta_i^2\sigma_M^2$,可以通过对冲减少
+  - 非市场风险: $\sigma_\epsilon^2$,可以通过分散投资减少
+- 对于市场协方差,则有$\sigma_{iM}=\beta_i\sigma_M^2$
+- 对于任意资产$i,j$则有$\sigma_{ij}=\beta_i\beta_j\sigma^2_M$
+
+##### Portfoilo风险
+
+- 给定权重为$w$的portoilo,则可以重新计算风险
+- $\beta_P=\sum_{i=1}^Nw_i\beta_i$
+- 通过分散投资减少非市场风险: $\epsilon_P=\sum_{i=1}^Nw_i\epsilon_i$
+
+### 3.6 三因子模型
+
+##### 模型定义
+
+- 通过添加其他参数作为回归项,来解释标的的收益率
+
+$$
+\mu_i-\mu_f=\alpha_i+\beta_{i1}(\mu_m-\mu_f)+\beta_{i2}\cdot \text{SMB}+\beta_{i3}\cdot\text{HML}+\epsilon_i
+$$
+
+- $\text{SMB}$: 小市值公司收益率更高
+- $\text{HML}$: 低市净率的公司收益率更高
+
+##### 计算流程
+
+1. 根据流通市值,将标的分成1:1的大市值(B)和小市值(S)组
+2. 根据BM(市净率倒数)数据将标的按照3:4:3分成(H/M/L)三组
+3. 通过市值加权计算每组中的平均收益率
+4. 通过收益率计算因子
+   - $\text{SMB}=\frac{1}{3}(\mu_{SL}+\mu_{SM}+\mu_{SH})-\frac{1}{3}(\mu_{BL}+\mu_{BM}+\mu_{BH})$
+   - $\text{HML}=\frac{1}{2}(\mu_{SH}+\mu_{BH})-\frac{1}{2}(\mu_{SL}+\mu_{BL})$
+
+
 
 
 
