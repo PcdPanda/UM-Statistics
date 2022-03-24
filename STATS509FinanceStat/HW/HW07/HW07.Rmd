@@ -120,26 +120,24 @@ Most of ACF lie in the confidence interval, since return doesn't have too much r
 
 (a)
 $$
-\mu_X=\mu_Z-\mu_Y\\
+\mu_X=\mu_Y-\mu_Z\\
 \gamma_X(h)=\text{Cov}(Y_{t+h}-Z_{t+h}, Y_t-Z_t)=\gamma_Y(h)+\gamma_Z(h)=\frac{\sigma_Y^2\alpha_Y^{|h|}}{1-\alpha_Y^2}+\frac{\sigma_Z^2\alpha_Z^{|h|}}{1-\alpha_Z^2}\\
 \rho_X(h)=\frac{\gamma_X(h)}{\gamma_X(0)}=\frac{(1-\alpha_Z^2)\alpha_Y^{|h|}\sigma_Y^2+(1-\alpha_Y^2)\alpha_Z^{|h|}\sigma_Z^2}{(1-\alpha_Z^2)\sigma_Y^2+(1-\alpha_Y^2)\sigma_Z^2}
 $$
-
 (b)
 $$
 \mu_X=\mu_Y+\mu_Y\mu_Z\\
 \gamma_X(h)=\text{Cov}(Y_{n+h}+Y_{n+h}Z_{n+h}, Y_n+Y_nZ_n)=\gamma_Y(h)+\gamma_{YZ}(h)+\text{Cov}(Y_{n+h}, Y_nZ_n)+\text{Cov}(Y_n, Y_{n+h}Z_{n+h})\\
 \text{Cov}(Y_{n+h}, Y_nZ_n)=E[(Y_{n+h}-\mu_Y)(Y_nZ_n-\mu_Y\mu_Z)]=\mu_Z\gamma_Y(h)=\text{Cov}(Y_n, Y_{n+h}Z_{n+h})\\
-\gamma_{YZ}(h)=\text{Cov}(Y_{n+h}Z_{n+h}, Y_nZ_n)=\text{Cov}(\alpha_Y\alpha_ZY_{n+h-1}Z_{n+h-1}+\alpha_ZZ_{n+h-1}\epsilon_Y+\alpha_YY_{n+h-1}\epsilon_Z+\epsilon_Y\epsilon_X, Y_nZ_n)\\
-\gamma_{YZ}(h)=(\alpha_Y\alpha_Z)^{|h|}\text{Var}(Y_nZ_n)=(\alpha_Y\alpha_Z)^{|h|}(E[(Y_nZ_n)^2]-E[(Y_nZ_n)]^2)=(\alpha_Y\alpha_Z)^{|h|}(E[Y_n^2]E[Z_n^2]-\mu_Y^2\mu_Z^2)\\
-E[Y_n^2]E[Z_n^2]=(\gamma_Y(0)+\mu_Y^2)(\gamma_Z(0)+\mu_Z^2)\\
-\gamma_{YZ}(h)=(\alpha_Y\alpha_Z)^{|h|}(\frac{\sigma_Y^2\sigma_Z^2}{(1-\alpha_Y^2)(1-\alpha_Z^2)}+\frac{\sigma_Y^2\mu_Z^2}{1-\alpha_Y^2}+\frac{\sigma_Z^2\mu_Y^2}{1-\alpha_Z^2})\\
-\gamma_X(h)=(1+2\mu_Z)\frac{\sigma_Y^2\alpha_Y^{|h|}}{1-\alpha_Y^2}+(\alpha_Y\alpha_Z)^{|h|}(\frac{\sigma_Y^2\sigma_Z^2}{(1-\alpha_Y^2)(1-\alpha_Z^2)}+\frac{\sigma_Y^2\mu_Z^2}{1-\alpha_Y^2}+\frac{\sigma_Z^2\mu_Y^2}{1-\alpha_Z^2})
+\gamma_{YZ}(h)=\text{Cov}(Y_{n+h}Z_{n+h}, Y_nZ_n)=E[(Y_{n+h}Z_{n+h})(Y_nZ_n)]-E(Y_{n+h}Z_{n+h})E(Y_{n}Z_{n})=E(Y_nY_{n+h})E(Z_nZ_{n+h})-\mu_Y^2\mu_Z^2\\
+E(Y_nY_{n+h})=E(Y_n)E(Y_{n+h})+\gamma_Y(h)=\mu_Y^2+\gamma_Y(h)\\
+\gamma_{YZ}(h)=\mu_Y^2\gamma_Z(h)+\mu_Z^2\gamma_Y(h)+\gamma_Y(h)\gamma_Z(h)\\
+\gamma_X(h)=\mu_Y^2\gamma_Z(h)+\mu_Z^2\gamma_Y(h)+\gamma_Y(h)\gamma_Z(h)+\gamma_Y(h)+2\mu_Z\gamma_Y(h)=\gamma_Y(h)(1+\mu_Z)^2+\gamma_Z(h)(\gamma_Y(h)+\mu_Y^2)=\frac{\sigma_Y^2\alpha_Y^{|h|}}{1-\alpha_Y^2}(1+\mu_Z^2)+\frac{\sigma_Z^2\alpha_Z^{|h|}}{1-\alpha_Z^2}(\frac{\sigma_Y^2\alpha_Y^{|h|}}{1-\alpha_Y^2}+\mu_Y^2)
 $$
 
 (c)
 
 $$
 \mu_X=2\mu_Y\\
-\gamma_X(h)=\text{Cov}(Y_{n+h}+Y_{n+1+h},Y_n+Y_{n+1})=2\gamma_Y(0)+\gamma_Y(h+1)+\gamma_Y(|h-1|)=\frac{\sigma_Y^2}{1-\alpha_Y^2}(2+\alpha_Y^{|h+1|}+\alpha_Y^{|h-1|})\\
+\gamma_X(h)=\text{Cov}(Y_{n+h}+Y_{n+1+h},Y_n+Y_{n+1})=2\gamma_Y(h)+\gamma_Y(h+1)+\gamma_Y(|h-1|)=\frac{\sigma_Y^2}{1-\alpha_Y^2}(2\alpha_Y^{|h|}+\alpha_Y^{|h+1|}+\alpha_Y^{|h-1|})\\
 $$
