@@ -1,0 +1,84 @@
+---
+title: "HW10"
+author: "Chongdan Pan"
+date: '2022-04-08'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, fig.align="center", error=FALSE)
+```
+
+## Question 1.
+
+(a)
+```{r results="hide"}
+X = read.csv("../NYA-2015-2017.csv",header=TRUE)
+NYSE_lret = diff(log(X$AdjClose))
+NYSE_lret.ts <- ts(data=NYSE_lret,start=c(2015,1),frequency=252,names=c('logret'))
+library("fGarch")
+garch <- garchFit(~garch(1,1), data=NYSE_lret, cond.dist=c("norm"), include.mean=TRUE)
+ar1garch <- garchFit(~arma(1,0)+garch(1,1), data=NYSE_lret, cond.dist=c("norm"), include.mean=TRUE)
+ar2garch <- garchFit(~arma(2,0)+garch(1,1), data=NYSE_lret, cond.dist=c("norm"), include.mean=TRUE)
+ar3garch <- garchFit(~arma(3,0)+garch(1,1), data=NYSE_lret, cond.dist=c("norm"), include.mean=TRUE)
+```
+
+Based on the fit result, we have 
+
+| Model | GARCH(1,1) | AR(1)+GARCH(1,1) | AR(2)+GARCH(1,1) | AR(3)+GARCH(1,1) |
+| ----- | ---------- | ---------------- | ---------------- | ---------------- |
+| AIC   | -7.107552  | -7.117713        | -7.117928        | -7.117406        |
+
+Therefore, I prefer AR(2) + GARCH(1,1)
+
+```{r}
+summary(ar2garch)
+```
+
+Since $\lambda=\alpha_1+\beta_1=0.9566$, the half-live of volatility is 17
+
+(b)
+
+```{r}
+innovations <- ar2garch@residuals / ar2garch@sigma.t
+qqnorm(innovations)
+qqline(innovations)
+q <- (1:length(NYSE_lret)) / (length(NYSE_lret) + 1)
+nu <- 6.5
+qqplot(qt(q, nu), innovations, main="T-distribution Q-Q Plot with dof=6.5")
+qqline(qt(q, nu), innovations)
+```
+
+It turns out that the p-value of Ljung-Box Test is large, implying that the residuals can be considered as stationary. On the other hand, Jarque-Bera Test shows that the residuals don't follow normal distribution, which conforms with my norm Q-Q plot. Actually, it appears that a T-distribution with degree of freedom to be 6.5 can be a good choice even though the tail is not asymmetric. We also need to note that the $\lambda$ is quite high in our case, may implying the unstationarity of the fitted model.
+
+(c)
+
+```{r}
+sigma = ar2garch@sigma.t[754]
+a0 = 2.9e-6
+a1 = 1.76e-1
+b1 = 7.8e-1
+sigma = sqrt(a0 + b1 * sigma ^2 + a1 * sigma^2)
+
+prediction <- predict(ar2garch, n.ahead=50)
+var <- -qnorm(0.005,0, sigma)
+es = sigma * dnorm(qnorm(0.005))/ 0.005
+var
+es
+```
+
+## Question 2.
+
+(a)
+When $n\rightarrow\infty$, we can calculate the expectation of $\log(H_\infty)$ and donate it as $X$. Therefore, we have $X=\alpha_0+X\sum_{j=1}^p\phi_j+\sum_{j=1}^q\theta_jE[V_{n-j}]+E[V_n]\rightarrow X=\frac{\alpha_0}{1-\sum_{j=1}^p\phi_j}$. 
+Therefore, for stability, $\sum_{j=1}^p\phi_j<1$
+
+(b)
+$$\text{Var}(A_n)=E(H_n\epsilon_n^2)-E(\sqrt AH_n)^2E(\epsilon_n)^2=E(H_n)\\
+E(\log H_n)=\sum_{j=0}^{n-1}\alpha_0\phi_1^j\\
+\text{Var}(\log H_n)=\text{Var}(\sum_{j=1}^{n-1}\phi_j\log H_{n-j})=\text{Var}[\sum_{j=1}^{n-1}\phi_1^j(\alpha_0V_{n-j})]=\sum_{j=0}^{n-1}\phi_1^{2j}\sigma_v^2\\
+\text{For }p=1\text{ and }q=0: \quad E(H_n)=\exp[E(\log H_n)+\sigma(\log H_n)^2/2]\\
+\text{Var}(A_n)=\exp[\sum_{j=0}^{n-1}\alpha_0\phi_1^j+\frac{1}{2}\sum_{j=0}^{n-1}\phi_1^{2j}\sigma_v^2]
+$$
+
+

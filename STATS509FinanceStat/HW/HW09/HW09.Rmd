@@ -1,0 +1,138 @@
+---
+title: "HW09"
+author: "Chongdan Pan"
+date: '2022-04-02'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE)
+```
+
+## Question 1
+
+$$
+\gamma(h)=\text{Cov}(X_{n+h},X_n)=\text{Cov}(\sum_{i=-\infty}^\infty\psi_i\epsilon_{n-i},\sum_{j=-\infty}^\infty\psi_j\epsilon_{n+h-j})\\
+\gamma(h)=\text{Cov}(\sum_{i=-\infty}^\infty\psi_i\epsilon_{n-i},\sum_{i=-\infty}^\infty\psi_{i+h}\epsilon_{n-i})=\sum_{i=-\infty}^\infty\psi_i\psi_{i+h}\sigma^2
+$$
+
+## Question 2
+
+(a)
+$$
+(1-\alpha_1B)X_n=(1+\theta_1B+\theta_2B^2)\epsilon_n\\
+X_n=\frac{1+\theta_1B+\theta_2B^2}{1-\alpha_1B}\epsilon_n=\sum_{i=0}^\infty\alpha_1^iB^i(1+\theta_1B+\theta_2B^2)\epsilon_n=\sum_{i=0}^\infty\alpha_1^i(1+\theta_1B+\theta_2B^2)\epsilon_{n-i}\\
+X_n=\sum_{i=0}^\infty\alpha_1^i(\epsilon_{n-i}+\theta_1\epsilon_{n-i-1}+\theta_2\epsilon_{n-i-2})=\epsilon_n+(\theta_1+\alpha_1)\epsilon_{n-1}+\sum_{i=0}^\infty\alpha_1^i(\theta_2+\alpha_1\theta_1+\alpha_1^2)\epsilon_{n-2-i}
+$$
+
+(b)
+Based on the result from question 1, we have
+
+$$
+\gamma(h)=\sum_{i=-\infty}^\infty\psi_i\psi_{i+h}\sigma^2=\sum_{i=0}^\infty\psi_i\psi_{i+h}\sigma^2\\
+\text{When } h=0\quad\gamma(h)=[1+(\alpha+\theta_1)^2+\sum_{i=0}^\infty\alpha_1^{2i}(\alpha_1^2+\alpha_1\theta_1+\theta_2)^2]\sigma^2 \\
+\text{When } h=\pm1\quad \gamma(h)=[(\alpha_1+\theta_1)(1+\alpha_1^2+\alpha_1\theta_1+\theta_2)+\sum_{i=0}^\infty\alpha_1^{2i+1}(\alpha_1^2+\alpha_1\theta_1+\theta_2)^2]\sigma^2 \\
+\text{When } h \geq 2 \text{ or } h\leq-2\quad \gamma(h)=\sum_{i=0}^\infty(\theta_2+\alpha_1\theta_1+\alpha_1^2)[1+\theta_1\alpha_1+(1+\theta_2)\alpha_1^2+\alpha_1^3\theta_1+\alpha_1^4]\alpha_1^{|h|-2+i}\sigma^2\\
+$$
+
+## Question 3
+
+```{r}
+X = read.csv("../NYA-2015-2017.csv",header=TRUE)
+library(tseries)
+NYSE_lret = diff(log(X$AdjClose))
+NYSE_lret.ts <- ts(data=NYSE_lret,start=c(2015,1),frequency=252,names=c('logret'))
+```
+
+(a)
+
+```{r}
+plot(NYSE_lret.ts)
+plot(abs(NYSE_lret.ts))
+```
+
+Based on the plot,  it looks like we can use a ARCH model to fit the absolute return, which is volatility because there is chance that the volatility at time $t$ may depend on it at $t-1$.
+
+(b)
+
+```{r}
+model <- garch(NYSE_lret.ts, order=c(1,1))
+summary(model)
+```
+
+For standard error, We have $6.23\times10^{-7}$ for $\alpha_0$, $2.04\times10^{-2}$fro $\alpha_1$, $2.73\times10^{-2}$ for $\beta_1$
+
+(c)
+
+```{r}
+csd <- fitted.values(model)
+plot(csd[,1])
+title(main="Estimated Condition Volatilities")
+resid <- residuals(model)
+plot(resid)
+title(main="Estimated Residuals")
+```
+
+(d)
+
+```{r}
+sd(na.omit(resid))
+mean(na.omit(resid))
+plot(model)
+```
+
+The mean and standard deviation of the residual is close to 0 and 1 respectively, implying that our code is working/ However, from the Q-Q plot of the residuals, it turns out we have heavy tails, which conform to the result from the Jarque Bera test. Since the P-value of the Box-Ljung test is large, we don't have significant evidence showing that the residuals are auto-correlated, which also conforms to the ACF plot. The value of $\alpha_0$ is quite small, implying that the lower bound of the volatility is small. In summary, our model does capture the time-series relation within the volatility, but we still need some way to deal with the heavy tail residuals.
+
+
+(e)
+
+Since the return's mean is extremely close to 0, we will assume $\mu_n=0$ in this case.
+
+```{r}
+sigma = (coef(model)[1] + coef(model)[3] * csd[754] ^ 2 + coef(model)[2] * NYSE_lret.ts[754] ^ 2) ^ 0.5
+var = exp(-qnorm(0.005) * sigma) - 1
+var
+
+```
+
+Therefore we have relative VaR to be 0.0118
+
+(f)
+
+```{r warning}
+q <- (1:length(NYSE_lret.ts)) / (length(NYSE_lret.ts) + 1)
+nu <- 4
+qqplot(resid, qt(q, nu))
+qqline(resid, qt(q, nu))
+```
+I'm using a t-distribution with degree of freedom to be 4 for fitting. Although we have a thin right tail, the left tail is well-fit, which is critical to the calculation of VaR.
+
+```{r}
+lambda = sqrt(sigma^2*(nu-2)/nu)
+var = exp(-qt(0.005, nu) * lambda) - 1
+var
+```
+
+Therefore, we have relative VaR based on T-distribution to be 0.0149
+
+(g)
+
+```{r}
+day = which.max(csd)
+day
+sigma = (coef(model)[1] + coef(model)[3] * csd[day-1] ^ 2 + coef(model)[2] * NYSE_lret.ts[day-1] ^ 2) ^ 0.5
+var = -qnorm(0.005) * sigma
+var = exp(var) - 1
+var
+```
+
+The index we have max volatility is 165 Therefore we have relative VaR to be 0.056 from normal distributed residual.
+
+```{r}
+lambda = sqrt(sigma^2*(nu-2)/nu)
+var = exp(-qt(0.005, nu) * lambda) - 1
+var
+```
+
+Therefore, we have relative VaR based on T-distribution to be 0.071
+

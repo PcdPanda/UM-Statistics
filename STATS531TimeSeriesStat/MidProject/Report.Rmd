@@ -8,6 +8,16 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning=FALSE, message=FALSE, fig.align="center", error=FALSE, fig.width=10)
+require(knitr)
+library(forecast)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(broom)
+# library(car)
+library(boot)
+library(pacman)
+library(tidyverse)
 ```
 ## 1. Introduction
 #### 1.1 Motivation
@@ -87,8 +97,6 @@ where \[\begin{eqnarray} \mu &=& {\mathbb{E}}[X_n] \\ {\phi}(x)&=&1-{\phi}_1 x-\
 The parameters for this model are \(\theta=({\phi}_{1:p},{\psi}_{1:q},\mu,\sigma^2)\)
 
 ```{r fig.height=5}
-require(knitr)
-library(forecast)
 aic_table <- function(data, P, Q, I){
   table <- matrix(NA, P+1, Q+1)
   for(p in 0:P){

@@ -1,0 +1,89 @@
+---
+title: "Stat 531 Homework 8"
+author: "Abby Loe, Chongdan Pan, Hanjun Li"
+date: "March 2022"
+output:
+  html_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, out.width = "50%", cache = TRUE)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(broom)
+library(car)
+library(pomp)
+library(tidyverse)
+```
+
+# Question 1
+
+(A) is correct because the measurement time needs to match the data, while the markov process can have as small of time steps as we want.
+
+# Question 2
+
+(A) is correct because W's type was not declared. Also, by process of elimination, none of the other possible reasons make any type of remote sense.
+
+
+# Question 3
+(B) is correct because we have an object that should be passed to the pomp object, but it doesn't have the parameter names that it needs.
+
+
+# Question 4
+
+(A) is correct; rnorm is an R command, and it has been used in a C-snippet. The C compiler cannot recognize the R command, and instead has started to treat it like a parameter passed to a C function.
+
+
+# Question 5
+
+i) and ii) are not true; we could choose $h(V_n)=3$, which would not have the Markov property, and we could choose $h(V_n)=I$ which would make $W_n$ a Markov process. This means that for some choices, $W_n$ is a Markov process.
+
+For a POMP model, $X_n$ is the latent variable, and is a Markov process because it's next state only depends on the previous state. Therefore iv) is true. This makes our final answer (B).
+
+
+# Question 6
+
+
+
+# Question 7
+
+
+
+# Question 8
+```{r}
+
+d <- dacca(deltaI=0.08)
+d%>%
+  pfilter(Np=1000) -> pf
+pf %>% logLik() %>% logmeanexp(se=FALSE) -> L_pf
+round(L_pf)
+```
+
+
+
+# Question 9
+
+# Question 10
+
+# Question 11
+
+
+# Question 12
+
+# Question 13
+
+
+
+# Question 14
+
+
+
+# Question 15
+
+
+
+# Question 16

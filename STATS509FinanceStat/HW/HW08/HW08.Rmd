@@ -1,0 +1,112 @@
+---
+title: "HW08"
+author: "Chongdan Pan"
+date: '2022-03-26'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, message=FALSE, fig.align="center", fig.width=10)
+```
+
+### 1
+
+(a) For the best predictor, when $X=2$, we have 
+$$
+\text{MPSE}=\frac{1}{6}(\hat Y-(-2))^2+\frac{1}{6}\hat Y^2+\frac{1}{6}(\hat Y-1)^2+\frac{1}{2}(\hat Y-2)^2
+=\frac{1}{6}(\hat Y+2)^2+\frac{1}{2}(\hat Y-2)^2=2\\
+$$
+$$\hat Y=\begin{cases}
+0 & X=0\\
+1 & X\in\{1,2\}
+\end{cases}$$
+Therefore, the MSPE for the predictor is $2$
+
+(b)
+We have $\mu_Y=\frac{5}{6}, \mu_X=\frac{3}{2},\sigma_X=\frac{7}{12},\sigma_{XY}=0.25$,
+
+therefore, our predictor is $\hat Y=\frac{5}{6}+\frac{3}{7}(X-\frac{3}{2})$
+
+the MPSE is $\frac{77}{36}-\frac{0.25^2}{7/12}=\frac{128}{63}$
+
+(c) In this case, the linear predictor is not the best predictor since the variables are not multivariate normal
+
+### 2
+
+(a)
+$$\gamma(k)=\text{Cov}(Y_t, Y_{t+k})=\text{Cov}[Y_t,\mu+\phi_1(Y_{t+k-1}-\mu)+\phi_2(Y_{t+k-2}-\mu)]=\text{Cov}(Y_t,\phi_1Y_{t+k-1}+\phi_2Y_{t+k-2})\\
+\rho(k)=\frac{\gamma(k)}{\gamma(0)}=\frac{\phi_1\text{Cov}(Y_t,Y_{t+k-1})+\phi_2\text{Cov}(Y_t,Y_{t+k-2})}{\gamma(0)}=\phi_1\rho(k-1)+\phi_2\rho(k-2)$$
+
+
+(b)
+For the first row on right side, $1\cdot \phi_1+\rho(1)\phi_2=\phi_1\rho(0)+$
+For the second row on right side, $\phi_1\rho(1)+\phi_21=\phi_1\rho(2-1)+\phi_2\rho(2-2)=\rho(2)$
+
+(c)
+```{r}
+A = matrix(c(1, 0.3, 0.3, 1), nrow=2)
+b = matrix(c(0.3, 0.2), nrow=2)
+solve(A, b)
+```
+Therefore, we have $\phi_1\approx0.264,\phi_2\approx0.121,\rho(3)\approx0.089$
+
+### 3
+
+(a)
+```{r}
+df <- read.csv("../RUT_03_2015-03_2019.csv", header=TRUE)
+ret = df$Adj.Close[2:nrow(df)] / df$Adj.Close[1:nrow(df)-1] - 1
+acf(ret)
+Box.test(ret, lag=10, type="Ljung")
+```
+
+The ACF plot shows that there is high correlation when the lag is 3 or 4, which may be fitted by a model. The p-value of the Box-Ljung test is large, so that we can't reject the null hypothesis, which is $\rho(i)=0$ for i <= 10.
+
+(b)
+
+```{r fig.height=7.5}
+ar_model = ar(ret)
+ar_model
+plot(ar_model$resid, type="l")
+acf(na.omit(ar_model$resid))
+Box.test(ret, lag=10, type="Ljung")
+qqnorm(ar_model$resid)
+qqline(ar_model$resid)
+```
+The optimal model is AR(4) with large coefficient for the 3rd and 4th terms. It makes perfect sense since we get large ACF for the original data when lag is 3 or 4. Based on the plot, it turns out that the AR(4) is working well since the ACF or residuals are in the confidence interval and the P-value for Ljung-Box is high. The residual looks like a normal distributed stationary white noise as well.
+
+(c)
+```{r fig.height=7.5}
+pred <- predict(ar_model, newdata=ret[206:209], n.ahead=12, sefit=TRUE)
+plot(c(1:12),pred$pred,type='b',lty=1,xlab='time ahead',
+ylab='Predicted',xlim=c(0,10),ylim=c(-.1,.15),lwd=2,col='blue',
+main = 'Assumes Xm = .1 -- Prediction')
+pred
+lines(c(1:12),pred$pred+1.96*pred$se,lty=2,lwd=2,col='red')
+lines(c(1:12),pred$pred-1.96*pred$se,lty=2,lwd=2,col='red')
+legend(4,.15, c("Predicted","+/- 1.96 standard errors"), lty=c(1,2), lwd=c(2,2),col=c("blue","red"), bg="gray90")
+```
+
+(d)
+```{r fig.height=7.5}
+library(forecast)
+ret_arima <- auto.arima(ret)
+ret_arima
+tsdiag(ret_arima)
+qqnorm(ret_arima$residuals)
+qqline(ret_arima$residuals)
+```
+
+The auto.arima function gives us an ARMA(0,0) model. However, the result is quite subtle since the ACF and p-value are extremely close to the confidence interval. The function chooses the model because it has less parameters so that the AIC value is higher. The AIC value for the model is -971, while ARMA(4,0) and ARMA(4,1) have -970.55 and -969.17 respectively.
+
+(e)
+```{r fig.height=7.5}
+pred <- predict(ret_arima, 12)
+plot(c(1:12),pred$pred,type='b',lty=1,xlab='time ahead',
+ylab='Predicted',xlim=c(0,10),ylim=c(-.1,.15),lwd=2,col='blue',
+main = 'Assumes Xm = .1 -- Prediction')
+pred
+lines(c(1:12),pred$pred+1.96*pred$se,lty=2,lwd=2,col='red')
+lines(c(1:12),pred$pred-1.96*pred$se,lty=2,lwd=2,col='red')
+legend(4,.15, c("Predicted","+/- 1.96 standard errors"), lty=c(1,2), lwd=c(2,2),col=c("blue","red"), bg="gray90")
+```
